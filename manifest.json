@@ -1,0 +1,13 @@
+{
+  "name": "Trip Expenses",
+  "short_name": "Trip $",
+  "description": "Track travel spending offline, with currency conversion and ATM fees.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f766e",
+  "theme_color": "#0f766e",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

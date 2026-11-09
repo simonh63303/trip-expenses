@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Trip Expenses</title>
+  <meta name="theme-color" content="#0f766e">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <label class="trip-picker">
+      <span class="sr-only">Active trip</span>
+      <select id="tripSelect"></select>
+    </label>
+    <span id="rateStatus" class="rate-status"></span>
+  </header>
+
+  <main>
+    <!-- ADD EXPENSE -->
+    <section id="view-add" class="view active">
+      <h1 id="addTitle">Add expense</h1>
+      <p id="noTripHint" class="hint" hidden>Create a trip first on the <b>Trips</b> tab.</p>
+      <form id="expenseForm" autocomplete="off">
+        <input type="hidden" id="editId">
+        <div class="row">
+          <label class="grow">Amount
+            <input id="amount" type="number" inputmode="decimal" step="any" min="0" required>
+          </label>
+          <label>Currency
+            <select id="currency"></select>
+          </label>
+        </div>
+        <p id="converted" class="converted"></p>
+
+        <label>Category
+          <select id="category"></select>
+        </label>
+
+        <label id="feeWrap" hidden>ATM fee <small>(same currency as withdrawal)</small>
+          <input id="atmFee" type="number" inputmode="decimal" step="any" min="0">
+        </label>
+
+        <div class="row">
+          <label class="grow">Date
+            <input id="date" type="date" required>
+          </label>
+        </div>
+
+        <label>Note <small>(optional)</small>
+          <input id="note" type="text" maxlength="120" placeholder="e.g. Ramen near hotel">
+        </label>
+
+        <details id="rateDetails">
+          <summary>Exchange rate</summary>
+          <label>1 <span class="homeCode"></span> = <input id="rate" type="number" step="any" min="0" inputmode="decimal"> <span id="rateCur"></span></label>
+          <p class="hint">Filled in automatically. Change it to match your card statement.</p>
+        </details>
+
+        <div class="row actions">
+          <button type="submit" class="primary grow" id="saveBtn">Save expense</button>
+          <button type="button" id="cancelEdit" hidden>Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- TRIPS -->
+    <section id="view-trips" class="view">
+      <h1>Trips</h1>
+      <form id="tripForm" class="card" autocomplete="off">
+        <input type="hidden" id="tripEditId">
+        <label>Trip name <input id="tripName" required maxlength="60" placeholder="e.g. Japan spring"></label>
+        <div class="row">
+          <label class="grow">Start <input id="tripStart" type="date"></label>
+          <label class="grow">End <input id="tripEnd" type="date"></label>
+        </div>
+        <label>Local currency <select id="tripCurrency"></select></label>
+        <div class="row actions">
+          <button type="submit" class="primary grow" id="tripSaveBtn">Add trip</button>
+          <button type="button" id="tripCancel" hidden>Cancel</button>
+        </div>
+      </form>
+      <div id="tripList"></div>
+      <h2 id="expensesHeading">Expenses</h2>
+      <div id="expenseList"></div>
+    </section>
+
+    <!-- SUMMARY -->
+    <section id="view-summary" class="view">
+      <h1>Summary</h1>
+      <div class="seg" role="group" aria-label="Summary scope">
+        <button type="button" data-scope="trip" class="on">This trip</button>
+        <button type="button" data-scope="all">All trips</button>
+      </div>
+      <div id="summary"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="view-settings" class="view">
+      <h1>Settings</h1>
+      <label>Home currency <select id="homeCurrency"></select></label>
+      <p class="hint">All totals are shown in this currency.</p>
+
+      <h2>Exchange rates</h2>
+      <p id="rateInfo" class="hint"></p>
+      <button type="button" id="refreshRates">Refresh rates now</button>
+
+      <h2>Categories</h2>
+      <ul id="catList" class="chips"></ul>
+      <form id="catForm" class="row">
+        <input id="catName" class="grow" placeholder="New category" maxlength="30" required>
+        <button type="submit">Add</button>
+      </form>
+
+      <h2>Backup</h2>
+      <p class="hint">Your data lives only on this device. Export a backup now and then.</p>
+      <div class="row">
+        <button type="button" id="exportBtn" class="grow">Export backup</button>
+        <label class="button grow">Import backup<input id="importFile" type="file" accept="application/json" hidden></label>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button data-view="add" class="on">＋<span>Add</span></button>
+    <button data-view="trips">✈<span>Trips</span></button>
+    <button data-view="summary">▤<span>Summary</span></button>
+    <button data-view="settings">⚙<span>Settings</span></button>
+  </nav>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="rates.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
