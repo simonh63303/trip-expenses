@@ -60,6 +60,11 @@
           <p class="hint">Filled in automatically. Change it to match your card statement.</p>
         </details>
 
+        <label id="stmtWrap" hidden>Amount on your statement <small>(<span class="homeCode"></span>, optional — add it later when the charge posts)</small>
+          <input id="statement" type="number" inputmode="decimal" step="any" min="0">
+        </label>
+        <p id="stmtDiff" class="hint"></p>
+
         <div class="row actions">
           <button type="submit" class="primary grow" id="saveBtn">Save expense</button>
           <button type="button" id="cancelEdit" hidden>Cancel</button>

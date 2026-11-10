@@ -27,6 +27,9 @@ The withdrawn cash is **not** counted as spending, because you log what you buy 
 ### Exchange rates
 When online, the app downloads daily rates from open.er-api.com (free, no key) and saves them on the device. Offline, it uses the last saved rates. Each expense keeps the rate it was logged with, so old totals don't shift. You can type your own rate under "Exchange rate", for example to match a card statement.
 
+### Checking your bank's conversion
+Each foreign expense saves the original amount and currency, the app's market-rate conversion, and (optionally) the **amount on your statement**. You can add that later, when the charge posts: tap the expense in the Trips tab. The difference is shown as **bank markup**, per expense and in the Summary, and is counted in your total spend.
+
 ## Files
 
 | File | What it does |

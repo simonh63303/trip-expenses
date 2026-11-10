@@ -73,16 +73,26 @@ function fillSelect(sel, values, selected) {
 
 const activeTrip = () => state.trips.find(t => t.id === state.activeTripId) || null;
 
-// Spend counts everything except the withdrawn cash itself (you log what you buy
-// with that cash separately), but ATM fees do count.
+// Extra the bank charged beyond the market-rate estimate (only once a statement amount is entered).
+function markup(e) {
+  return e.statementAmount != null ? e.statementAmount - e.homeAmount - (e.homeFee || 0) : 0;
+}
+
+// What an expense costs you. Withdrawn cash itself isn't counted (you log what you buy
+// with it separately), but ATM fees and bank markup are.
+function cost(e) {
+  return (e.category === CASH ? 0 : e.homeAmount) + (e.homeFee || 0) + markup(e);
+}
+
 function totals(expenses) {
-  let spend = 0, fees = 0, cash = 0;
+  let spend = 0, fees = 0, cash = 0, bank = 0, checked = 0;
   for (const e of expenses) {
+    spend += cost(e);
     fees += e.homeFee || 0;
     if (e.category === CASH) cash += e.homeAmount;
-    else spend += e.homeAmount;
+    if (e.statementAmount != null) { bank += markup(e); checked++; }
   }
-  return { spend: spend + fees, fees, cash };
+  return { spend, fees, cash, bank, checked };
 }
 
 // ---------- Navigation ----------
@@ -136,6 +146,7 @@ function setRateField() {
   $('rateCur').textContent = cur;
   document.querySelectorAll('.homeCode').forEach(el => el.textContent = state.home);
   $('rateDetails').hidden = cur === state.home;
+  $('stmtWrap').hidden = cur === state.home;
   updateConverted();
 }
 
@@ -144,11 +155,25 @@ function updateConverted() {
   const cur = $('currency').value;
   const rate = parseFloat($('rate').value);
   const fee = parseFloat($('atmFee').value) || 0;
+  const stmt = parseFloat($('statement').value);
+  $('stmtDiff').textContent = '';
   if (!amt || cur === state.home) { $('converted').textContent = ''; return; }
   if (!rate) { $('converted').textContent = 'No rate yet — enter one under Exchange rate'; return; }
   let txt = '≈ ' + money(amt / rate);
   if ($('category').value === CASH && fee) txt += ` + ${money(fee / rate)} fee`;
   $('converted').textContent = txt;
+  if (stmt > 0) {
+    const est = (amt + ($('category').value === CASH ? fee : 0)) / rate;
+    $('stmtDiff').textContent = diffText(stmt, est);
+  }
+}
+
+// e.g. "Bank charged $0.15 more (+1.6%) than the market rate"
+function diffText(stmt, est) {
+  const d = stmt - est;
+  if (Math.abs(d) < 0.005) return 'Matches the market rate';
+  const pct = est ? ` (${d > 0 ? '+' : ''}${(d / est * 100).toFixed(1)}%)` : '';
+  return `Bank charged ${money(Math.abs(d))} ${d > 0 ? 'more' : 'less'}${pct} than the market rate`;
 }
 
 function toggleFee() { $('feeWrap').hidden = $('category').value !== CASH; updateConverted(); }
@@ -176,6 +201,7 @@ function renderAddView() {
 $('amount').addEventListener('input', updateConverted);
 $('atmFee').addEventListener('input', updateConverted);
 $('rate').addEventListener('input', updateConverted);
+$('statement').addEventListener('input', updateConverted);
 $('currency').addEventListener('change', setRateField);
 $('category').addEventListener('change', toggleFee);
 $('cancelEdit').addEventListener('click', () => { resetExpenseForm(); showView('trips'); });
@@ -191,6 +217,8 @@ $('expenseForm').addEventListener('submit', e => {
   if (!(rate > 0)) { $('rateDetails').open = true; $('rate').focus(); toast('Enter an exchange rate'); return; }
   const category = $('category').value;
   const atmFee = category === CASH ? (parseFloat($('atmFee').value) || 0) : 0;
+  const stmt = parseFloat($('statement').value);
+  const statementAmount = currency !== state.home && stmt > 0 ? round2(stmt) : null;
 
   const editId = $('editId').value;
   const expense = {
@@ -202,6 +230,7 @@ $('expenseForm').addEventListener('submit', e => {
     atmFee, rate,
     homeAmount: round2(amount / rate),
     homeFee: round2(atmFee / rate),
+    statementAmount, // what the bank actually charged, in home currency (null until entered)
   };
 
   if (editId) state.expenses = state.expenses.map(x => x.id === editId ? expense : x);
@@ -238,6 +267,8 @@ function editExpense(id) {
   $('rate').value = x.rate;
   $('rateCur').textContent = x.currency;
   $('rateDetails').hidden = x.currency === state.home;
+  $('stmtWrap').hidden = x.currency === state.home;
+  $('statement').value = x.statementAmount ?? '';
   updateConverted();
 }
 
@@ -338,7 +369,11 @@ function renderTrips() {
     return `<div class="day-head"><span>${fmtDate(day)}</span><span>${money(totals(items).spend)}</span></div>` +
       items.map(e => {
         const foreign = e.currency !== state.home;
-        const feeTxt = e.atmFee ? ` · fee ${money(e.atmFee, e.currency)}` : '';
+        let feeTxt = e.atmFee ? ` · fee ${money(e.atmFee, e.currency)}` : '';
+        if (e.statementAmount != null) {
+          const m = markup(e);
+          feeTxt += ` · bank ${money(e.statementAmount)}` + (Math.abs(m) >= 0.005 ? ` (${m > 0 ? '+' : '−'}${money(Math.abs(m))})` : ' ✓');
+        } else if (foreign) feeTxt += ' · not checked';
         return `<div class="list-item">
           <div class="main" data-edit="${e.id}" style="cursor:pointer">
             <div class="title">${esc(e.note || e.category)}</div>
@@ -379,6 +414,19 @@ function bars(rows) {
   </li>`).join('')}</ul>`;
 }
 
+// Compares what the bank charged against the market-rate estimate, for expenses with a statement amount.
+function bankSection(exps, t) {
+  const foreign = exps.filter(e => e.currency !== state.home);
+  if (!foreign.length) return '';
+  if (!t.checked) return `<p class="hint">Add the statement amount to foreign expenses to see what your bank or card charges on top of the market rate.</p>`;
+  const est = foreign.filter(e => e.statementAmount != null).reduce((s, e) => s + e.homeAmount + (e.homeFee || 0), 0);
+  const pct = est ? ` (${t.bank >= 0 ? '+' : ''}${(t.bank / est * 100).toFixed(2)}%)` : '';
+  return `<div class="stats" style="margin-top:8px">
+    <div class="stat"><div class="label">Bank markup${pct}</div><div class="value">${money(t.bank)}</div></div>
+    <div class="stat"><div class="label">Checked vs statement</div><div class="value">${t.checked} of ${foreign.length}</div></div>
+  </div>`;
+}
+
 function renderSummary() {
   const trip = activeTrip();
   const exps = summaryScope === 'trip'
@@ -394,13 +442,14 @@ function renderSummary() {
   const cat = {};
   exps.forEach(e => { if (e.category !== CASH) cat[e.category] = (cat[e.category] || 0) + e.homeAmount; });
   if (t.fees) cat['ATM fees'] = t.fees;
+  if (t.bank > 0.005) cat['Bank markup'] = t.bank;
   const catRows = Object.entries(cat).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
 
   // Per week (Monday start)
   const wk = {};
   exps.forEach(e => {
     const w = weekStart(e.date);
-    wk[w] = (wk[w] || 0) + (e.category === CASH ? 0 : e.homeAmount) + (e.homeFee || 0);
+    wk[w] = (wk[w] || 0) + cost(e);
   });
   const weekRows = Object.keys(wk).sort().map(w => ({ label: 'Week of ' + fmtDate(w, { month: 'short', day: 'numeric' }), value: wk[w] }));
 
@@ -410,7 +459,8 @@ function renderSummary() {
     <div class="stat"><div class="label">ATM fees</div><div class="value">${money(t.fees)}</div></div>
     <div class="stat"><div class="label">Cash withdrawn</div><div class="value">${money(t.cash)}</div></div>
   </div>
-  <p class="hint">Cash withdrawn isn't added to the total — log what you buy with the cash instead. ATM fees are included.</p>
+  ${bankSection(exps, t)}
+  <p class="hint">Cash withdrawn isn't added to the total — log what you buy with the cash instead. ATM fees and bank markup are included.</p>
   <h2>By week</h2>${bars(weekRows)}
   <h2>By category</h2>${bars(catRows)}`;
 
@@ -446,6 +496,7 @@ $('homeCurrency').addEventListener('change', async e => {
   state.expenses.forEach(x => {
     x.homeAmount = round2(x.homeAmount * factor);
     x.homeFee = round2((x.homeFee || 0) * factor);
+    if (x.statementAmount != null) x.statementAmount = round2(x.statementAmount * factor);
     x.rate = x.rate / factor;
   });
   state.home = newHome;
