@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
   <header class="topbar">
@@ -59,12 +59,6 @@
           <label>1 <span class="homeCode"></span> = <input id="rate" type="number" step="any" min="0" inputmode="decimal"> <span id="rateCur"></span></label>
           <p class="hint">Filled in automatically. Change it to match your card statement.</p>
         </details>
-
-        <label id="stmtWrap" hidden>Amount on your statement <small>(<span class="homeCode"></span>, optional — add it later when the charge posts)</small>
-          <input id="statement" type="number" inputmode="decimal" step="any" min="0">
-        </label>
-        <p id="stmtDiff" class="hint"></p>
-
         <div class="row actions">
           <button type="submit" class="primary grow" id="saveBtn">Save expense</button>
           <button type="button" id="cancelEdit" hidden>Cancel</button>
@@ -103,6 +97,15 @@
       <div id="summary"></div>
     </section>
 
+    <!-- RECONCILE (opened from Summary) -->
+    <section id="view-reconcile" class="view">
+      <button type="button" class="back" id="reconcileBack">‹ Summary</button>
+      <h1 id="reconcileTitle">Reconcile</h1>
+      <p class="hint">Enter what each charge cost on your card or bank statement. It's saved as you type, so you can stop and come back later.</p>
+      <div id="reconcileTotals"></div>
+      <div id="reconcileList"></div>
+    </section>
+
     <!-- SETTINGS -->
     <section id="view-settings" class="view">
       <h1>Settings</h1>
@@ -138,7 +141,7 @@
 
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <script src="rates.js"></script>
-  <script src="app.js"></script>
+  <script src="rates.js?v=3"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

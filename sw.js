@@ -1,5 +1,6 @@
 // Service worker: saves the app's files so it opens without internet.
 // Online it always loads fresh files; offline it uses the last saved copy.
+// When you change styles.css or a .js file, bump the ?v= number in index.html too.
 const VERSION = 'v1';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'rates.js', 'manifest.json', 'icon.svg'];
 
@@ -21,7 +22,7 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   // Network first (so updates show up right away), saved copy when offline.
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: 'no-cache' }) // always check the server for a newer version
       .then(res => {
         if (res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(e.request, copy)); }
         return res;

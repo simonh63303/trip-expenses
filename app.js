@@ -99,8 +99,10 @@ function totals(expenses) {
 
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
-  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.view === name));
+  const tab = name === 'reconcile' ? 'summary' : name; // Reconcile lives under Summary
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.view === tab));
   if (name === 'trips') renderTrips();
+  if (name === 'reconcile') renderReconcile();
   if (name === 'summary') renderSummary();
   if (name === 'settings') renderSettings();
   window.scrollTo(0, 0);
@@ -146,7 +148,6 @@ function setRateField() {
   $('rateCur').textContent = cur;
   document.querySelectorAll('.homeCode').forEach(el => el.textContent = state.home);
   $('rateDetails').hidden = cur === state.home;
-  $('stmtWrap').hidden = cur === state.home;
   updateConverted();
 }
 
@@ -155,17 +156,11 @@ function updateConverted() {
   const cur = $('currency').value;
   const rate = parseFloat($('rate').value);
   const fee = parseFloat($('atmFee').value) || 0;
-  const stmt = parseFloat($('statement').value);
-  $('stmtDiff').textContent = '';
   if (!amt || cur === state.home) { $('converted').textContent = ''; return; }
   if (!rate) { $('converted').textContent = 'No rate yet — enter one under Exchange rate'; return; }
   let txt = '≈ ' + money(amt / rate);
   if ($('category').value === CASH && fee) txt += ` + ${money(fee / rate)} fee`;
   $('converted').textContent = txt;
-  if (stmt > 0) {
-    const est = (amt + ($('category').value === CASH ? fee : 0)) / rate;
-    $('stmtDiff').textContent = diffText(stmt, est);
-  }
 }
 
 // e.g. "Bank charged $0.15 more (+1.6%) than the market rate"
@@ -201,7 +196,6 @@ function renderAddView() {
 $('amount').addEventListener('input', updateConverted);
 $('atmFee').addEventListener('input', updateConverted);
 $('rate').addEventListener('input', updateConverted);
-$('statement').addEventListener('input', updateConverted);
 $('currency').addEventListener('change', setRateField);
 $('category').addEventListener('change', toggleFee);
 $('cancelEdit').addEventListener('click', () => { resetExpenseForm(); showView('trips'); });
@@ -217,13 +211,13 @@ $('expenseForm').addEventListener('submit', e => {
   if (!(rate > 0)) { $('rateDetails').open = true; $('rate').focus(); toast('Enter an exchange rate'); return; }
   const category = $('category').value;
   const atmFee = category === CASH ? (parseFloat($('atmFee').value) || 0) : 0;
-  const stmt = parseFloat($('statement').value);
-  const statementAmount = currency !== state.home && stmt > 0 ? round2(stmt) : null;
-
   const editId = $('editId').value;
+  const old = editId ? state.expenses.find(x => x.id === editId) : null;
+  // Statement amounts are entered on the Reconcile screen; keep any existing one when editing.
+  const statementAmount = old && currency !== state.home ? (old.statementAmount ?? null) : null;
   const expense = {
     id: editId || uid(),
-    tripId: editId ? state.expenses.find(x => x.id === editId).tripId : trip.id,
+    tripId: old ? old.tripId : trip.id,
     date: $('date').value,
     amount, currency, category,
     note: $('note').value.trim(),
@@ -267,8 +261,6 @@ function editExpense(id) {
   $('rate').value = x.rate;
   $('rateCur').textContent = x.currency;
   $('rateDetails').hidden = x.currency === state.home;
-  $('stmtWrap').hidden = x.currency === state.home;
-  $('statement').value = x.statementAmount ?? '';
   updateConverted();
 }
 
@@ -414,18 +406,83 @@ function bars(rows) {
   </li>`).join('')}</ul>`;
 }
 
-// Compares what the bank charged against the market-rate estimate, for expenses with a statement amount.
+const estimate = e => e.homeAmount + (e.homeFee || 0); // market-rate value incl. ATM fee
+
+function markupPct(exps) {
+  const checked = exps.filter(e => e.statementAmount != null);
+  const est = checked.reduce((s, e) => s + estimate(e), 0);
+  const bank = checked.reduce((s, e) => s + markup(e), 0);
+  return est ? ` (${bank >= 0 ? '+' : ''}${(bank / est * 100).toFixed(2)}%)` : '';
+}
+
+// Bank-vs-market summary, with a link to the Reconcile screen for the active trip.
 function bankSection(exps, t) {
   const foreign = exps.filter(e => e.currency !== state.home);
   if (!foreign.length) return '';
-  if (!t.checked) return `<p class="hint">Add the statement amount to foreign expenses to see what your bank or card charges on top of the market rate.</p>`;
-  const est = foreign.filter(e => e.statementAmount != null).reduce((s, e) => s + e.homeAmount + (e.homeFee || 0), 0);
-  const pct = est ? ` (${t.bank >= 0 ? '+' : ''}${(t.bank / est * 100).toFixed(2)}%)` : '';
+  const btn = summaryScope === 'trip'
+    ? `<button type="button" class="primary" id="openReconcile" style="width:100%">${t.checked ? 'Continue reconciling' : 'Reconcile with statement'}</button>` : '';
+  if (!t.checked) return `<p class="hint">Trip over? Compare each foreign charge with your card statement to see what your bank added on top of the market rate.</p>${btn}`;
   return `<div class="stats" style="margin-top:8px">
-    <div class="stat"><div class="label">Bank markup${pct}</div><div class="value">${money(t.bank)}</div></div>
-    <div class="stat"><div class="label">Checked vs statement</div><div class="value">${t.checked} of ${foreign.length}</div></div>
-  </div>`;
+    <div class="stat"><div class="label">Bank markup${markupPct(foreign)}</div><div class="value">${money(t.bank)}</div></div>
+    <div class="stat"><div class="label">Reconciled</div><div class="value">${t.checked} of ${foreign.length}</div></div>
+  </div>${btn}`;
 }
+
+$('summary').addEventListener('click', e => { if (e.target.id === 'openReconcile') showView('reconcile'); });
+$('reconcileBack').addEventListener('click', () => showView('summary'));
+
+// ---------- Reconcile ----------
+
+function reconcileExpenses() {
+  const trip = activeTrip();
+  return trip ? state.expenses
+    .filter(e => e.tripId === trip.id && e.currency !== state.home)
+    .sort((a, b) => a.date.localeCompare(b.date)) : [];
+}
+
+function renderReconcileTotals() {
+  const exps = reconcileExpenses();
+  const t = totals(exps);
+  const checked = exps.filter(e => e.statementAmount != null);
+  $('reconcileTotals').innerHTML = `<div class="stats">
+    <div class="stat"><div class="label">Reconciled</div><div class="value">${t.checked} of ${exps.length}</div></div>
+    <div class="stat"><div class="label">Bank markup${markupPct(exps)}</div><div class="value">${money(t.bank)}</div></div>
+  </div>
+  ${checked.length ? `<p class="hint">Statement total ${money(checked.reduce((s, e) => s + e.statementAmount, 0))} vs market rate ${money(checked.reduce((s, e) => s + estimate(e), 0))} for the reconciled charges.</p>` : ''}`;
+}
+
+function renderReconcile() {
+  const trip = activeTrip();
+  $('reconcileTitle').textContent = trip ? `Reconcile — ${trip.name}` : 'Reconcile';
+  document.querySelectorAll('.homeCode').forEach(el => el.textContent = state.home);
+  const exps = reconcileExpenses();
+  renderReconcileTotals();
+  $('reconcileList').innerHTML = exps.length ? exps.map(e => `
+    <div class="list-item rec-row${e.statementAmount != null ? ' done' : ''}">
+      <div class="main">
+        <div class="title">${esc(e.note || e.category)}</div>
+        <div class="sub">${fmtDate(e.date)} · ${money(e.amount, e.currency)}${e.atmFee ? ` + ${money(e.atmFee, e.currency)} fee` : ''} · market ≈ ${money(estimate(e))}</div>
+        <div class="sub rec-diff" data-diff="${e.id}">${e.statementAmount != null ? diffText(e.statementAmount, estimate(e)) : ''}</div>
+      </div>
+      <label class="rec-input"><span class="sr-only">Statement amount for ${esc(e.note || e.category)}</span>
+        <input type="number" inputmode="decimal" step="any" min="0" placeholder="${state.home}" data-stmt="${e.id}" value="${e.statementAmount ?? ''}">
+      </label>
+    </div>`).join('')
+    : '<p class="empty">No foreign-currency charges on this trip.</p>';
+}
+
+// Save each statement amount as it's typed; update just that row and the totals.
+$('reconcileList').addEventListener('input', ev => {
+  const id = ev.target.dataset.stmt;
+  if (!id) return;
+  const x = state.expenses.find(e => e.id === id);
+  const v = parseFloat(ev.target.value);
+  x.statementAmount = v > 0 ? round2(v) : null;
+  save();
+  $('reconcileList').querySelector(`[data-diff="${id}"]`).textContent = x.statementAmount != null ? diffText(x.statementAmount, estimate(x)) : '';
+  ev.target.closest('.rec-row').classList.toggle('done', x.statementAmount != null);
+  renderReconcileTotals();
+});
 
 function renderSummary() {
   const trip = activeTrip();
@@ -574,6 +631,7 @@ function renderAll() {
   renderAddView();
   if ($('view-trips').classList.contains('active')) renderTrips();
   if ($('view-summary').classList.contains('active')) renderSummary();
+  if ($('view-reconcile').classList.contains('active')) renderReconcile();
 }
 
 if (!state.activeTripId && state.trips.length) state.activeTripId = state.trips[0].id;
