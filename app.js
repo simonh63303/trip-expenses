@@ -105,6 +105,7 @@ function showView(name) {
   if (name === 'reconcile') renderReconcile();
   if (name === 'summary') renderSummary();
   if (name === 'settings') renderSettings();
+  if (name === 'report') renderReport();
   window.scrollTo(0, 0);
 }
 
@@ -484,6 +485,15 @@ $('reconcileList').addEventListener('input', ev => {
   renderReconcileTotals();
 });
 
+// Spend per category. Withdrawn cash is left out; ATM fees and bank markup get their own lines.
+function categoryRows(exps, t = totals(exps)) {
+  const cat = {};
+  exps.forEach(e => { if (e.category !== CASH) cat[e.category] = (cat[e.category] || 0) + e.homeAmount; });
+  if (t.fees) cat['ATM fees'] = t.fees;
+  if (Math.abs(t.bank) > 0.005) cat['Bank markup'] = t.bank;
+  return Object.entries(cat).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+}
+
 function renderSummary() {
   const trip = activeTrip();
   const exps = summaryScope === 'trip'
@@ -495,12 +505,7 @@ function renderSummary() {
   const t = totals(exps);
   const days = new Set(exps.map(e => e.date)).size;
 
-  // Per category (withdrawn cash shown separately, fees as their own line)
-  const cat = {};
-  exps.forEach(e => { if (e.category !== CASH) cat[e.category] = (cat[e.category] || 0) + e.homeAmount; });
-  if (t.fees) cat['ATM fees'] = t.fees;
-  if (t.bank > 0.005) cat['Bank markup'] = t.bank;
-  const catRows = Object.entries(cat).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+  const catRows = categoryRows(exps, t);
 
   // Per week (Monday start)
   const wk = {};
@@ -528,6 +533,196 @@ function renderSummary() {
   }
   el.innerHTML = html;
 }
+
+// ---------- Report ----------
+
+const ALL = '__all';
+const report = { mode: 'trip', tripId: null, rangeTripId: ALL, from: '', to: '' };
+
+const tripName = id => state.trips.find(t => t.id === id)?.name || '';
+
+function fillTripOptions(sel, selected) {
+  sel.innerHTML = `<option value="${ALL}">All trips</option>` + state.trips.map(t =>
+    `<option value="${t.id}"${t.id === selected ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
+  if (selected === ALL || !state.trips.some(t => t.id === selected)) sel.value = ALL;
+}
+
+// The expenses the current report covers, oldest first, plus a title and a period label.
+function reportData() {
+  let exps = state.expenses, title, period;
+  if (report.mode === 'trip') {
+    const trip = state.trips.find(t => t.id === report.tripId);
+    if (trip) {
+      exps = exps.filter(e => e.tripId === trip.id);
+      title = trip.name;
+      period = [trip.start, trip.end].filter(Boolean).join(' to ');
+    } else title = 'All trips';
+  } else {
+    let { from, to } = report;
+    if (from && to && from > to) [from, to] = [to, from];
+    if (from) exps = exps.filter(e => e.date >= from);
+    if (to) exps = exps.filter(e => e.date <= to);
+    if (report.rangeTripId !== ALL) exps = exps.filter(e => e.tripId === report.rangeTripId);
+    title = report.rangeTripId === ALL ? 'All trips' : tripName(report.rangeTripId);
+    period = from || to ? `${from || 'start'} to ${to || 'today'}` : 'All dates';
+  }
+  exps = [...exps].sort((a, b) => a.date.localeCompare(b.date));
+  if (!period && exps.length) period = `${exps[0].date} to ${exps[exps.length - 1].date}`;
+  return { exps, title, period: period || '' };
+}
+
+// Totals grouped by trip and by original currency.
+function groupRows(exps) {
+  const byTrip = {}, byCur = {};
+  for (const e of exps) {
+    byTrip[e.tripId] = (byTrip[e.tripId] || 0) + cost(e);
+    const c = (byCur[e.currency] ||= { local: 0, home: 0, n: 0 });
+    c.local += e.amount + (e.atmFee || 0);
+    c.home += e.homeAmount + (e.homeFee || 0);
+    c.n++;
+  }
+  return {
+    trips: Object.entries(byTrip).map(([id, value]) => ({ label: tripName(id) || '(deleted trip)', value })).sort((a, b) => b.value - a.value),
+    currencies: Object.entries(byCur).map(([cur, v]) => ({ cur, ...v })).sort((a, b) => b.home - a.home),
+  };
+}
+
+function table(head, rows, foot) {
+  const cell = (c, i) => `<td${i ? ' class="num"' : ''}>${c}</td>`;
+  return `<table class="report-table"><thead><tr>${head.map((h, i) => `<th${i ? ' class="num"' : ''}>${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${r.map(cell).join('')}</tr>`).join('')}</tbody>
+    ${foot ? `<tfoot><tr>${foot.map(cell).join('')}</tr></tfoot>` : ''}</table>`;
+}
+
+function renderReport() {
+  if (!report.tripId) report.tripId = state.activeTripId || ALL;
+  fillTripOptions($('reportTrip'), report.tripId);
+  fillTripOptions($('reportRangeTrip'), report.rangeTripId);
+  $('reportFrom').value = report.from;
+  $('reportTo').value = report.to;
+  $('reportTripWrap').hidden = report.mode !== 'trip';
+  $('reportRangeWrap').hidden = report.mode !== 'range';
+  document.querySelectorAll('#reportMode button').forEach(b => b.classList.toggle('on', b.dataset.mode === report.mode));
+
+  const { exps, title, period } = reportData();
+  const el = $('report');
+  $('exportDetailsCsv').disabled = $('exportSummaryCsv').disabled = !exps.length;
+  if (!exps.length) { el.innerHTML = '<p class="empty">No expenses match this report.</p>'; return; }
+
+  const t = totals(exps);
+  const days = new Set(exps.map(e => e.date)).size;
+  const multiTrip = new Set(exps.map(e => e.tripId)).size > 1;
+  const g = groupRows(exps);
+
+  let html = `<p class="report-meta"><b>${esc(title)}</b>${period ? ' · ' + esc(period) : ''} · ${exps.length} expense${exps.length > 1 ? 's' : ''}</p>
+  <div class="stats">
+    <div class="stat"><div class="label">Total spent</div><div class="value">${money(t.spend)}</div></div>
+    <div class="stat"><div class="label">Per day (${days} day${days > 1 ? 's' : ''})</div><div class="value">${money(t.spend / days)}</div></div>
+    <div class="stat"><div class="label">ATM fees</div><div class="value">${money(t.fees)}</div></div>
+    <div class="stat"><div class="label">Cash withdrawn</div><div class="value">${money(t.cash)}</div></div>
+    ${t.checked ? `<div class="stat"><div class="label">Bank markup</div><div class="value">${money(t.bank)}</div></div>` : ''}
+  </div>
+  <h2>By category</h2>
+  ${table(['Category', state.home], categoryRows(exps, t).map(r => [esc(r.label), money(r.value)]), ['Total', money(t.spend)])}`;
+  if (multiTrip) html += `<h2>By trip</h2>${table(['Trip', state.home], g.trips.map(r => [esc(r.label), money(r.value)]))}`;
+  if (g.currencies.length > 1 || g.currencies[0]?.cur !== state.home) {
+    html += `<h2>By currency</h2><p class="hint">Includes cash withdrawals and ATM fees, at market rate.</p>
+    ${table(['Currency', 'Paid', state.home], g.currencies.map(c => [esc(c.cur), money(c.local, c.cur), money(c.home)]))}`;
+  }
+
+  html += '<h2>Details</h2>';
+  const byDay = {};
+  exps.forEach(e => (byDay[e.date] ||= []).push(e));
+  html += Object.keys(byDay).map(day => {
+    const items = byDay[day];
+    return `<div class="day-head"><span>${fmtDate(day)}</span><span>${money(totals(items).spend)}</span></div>` +
+      items.map(e => {
+        const foreign = e.currency !== state.home;
+        const bits = [multiTrip && tripName(e.tripId), e.category, e.atmFee && `fee ${money(e.atmFee, e.currency)}`,
+          e.statementAmount != null && `bank ${money(e.statementAmount)}`].filter(Boolean).map(esc);
+        return `<div class="list-item"><div class="main">
+            <div class="title">${esc(e.note || e.category)}</div>
+            <div class="sub">${bits.join(' · ')}</div>
+          </div>
+          <div class="amt">${money(e.amount, e.currency)}${foreign ? `<small>${money(e.homeAmount)}</small>` : ''}</div>
+        </div>`;
+      }).join('');
+  }).join('');
+  el.innerHTML = html;
+}
+
+document.querySelectorAll('#reportMode button').forEach(b => b.addEventListener('click', () => {
+  report.mode = b.dataset.mode;
+  if (report.mode === 'range' && !report.from && !report.to) { // default to this month
+    const today = todayStr();
+    report.from = today.slice(0, 8) + '01';
+    report.to = today;
+  }
+  renderReport();
+}));
+$('reportTrip').addEventListener('change', e => { report.tripId = e.target.value; renderReport(); });
+$('reportRangeTrip').addEventListener('change', e => { report.rangeTripId = e.target.value; renderReport(); });
+$('reportFrom').addEventListener('change', e => { report.from = e.target.value; renderReport(); });
+$('reportTo').addEventListener('change', e => { report.to = e.target.value; renderReport(); });
+
+// ---------- CSV export ----------
+
+function csvCell(v) {
+  if (v == null) return '';
+  let s = String(v);
+  if (typeof v === 'string' && /^[=+\-@\t]/.test(s) && isNaN(s)) s = "'" + s; // stop spreadsheets running it as a formula
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+const csv = rows => '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n'; // BOM so Excel reads UTF-8
+const n2 = n => n == null ? '' : round2(n).toFixed(2);
+const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'report';
+
+function download(text, name, type = 'text/csv;charset=utf-8') {
+  const blob = new Blob([text], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function reportFileName(kind, title) {
+  return `${slug(title)}-${kind}-${todayStr()}.csv`;
+}
+
+$('exportDetailsCsv').addEventListener('click', () => {
+  const { exps, title } = reportData();
+  const H = state.home;
+  const rows = [['Date', 'Trip', 'Category', 'Note', 'Amount', 'Currency', `Rate (per 1 ${H})`, `Amount (${H})`,
+    'ATM fee', `ATM fee (${H})`, `Statement (${H})`, `Bank markup (${H})`, `Cost (${H})`]];
+  for (const e of exps) {
+    rows.push([e.date, tripName(e.tripId), e.category, e.note, e.amount, e.currency, +(+e.rate).toPrecision(8), n2(e.homeAmount),
+      e.atmFee || '', e.homeFee ? n2(e.homeFee) : '', n2(e.statementAmount),
+      e.statementAmount != null ? n2(markup(e)) : '', n2(cost(e))]);
+  }
+  rows.push(['Total', '', '', '', '', '', '', '', '', '', '', '', n2(totals(exps).spend)]);
+  download(csv(rows), reportFileName('details', title));
+  toast(`Exported ${exps.length} expenses`);
+});
+
+$('exportSummaryCsv').addEventListener('click', () => {
+  const { exps, title, period } = reportData();
+  const H = state.home;
+  const t = totals(exps);
+  const days = new Set(exps.map(e => e.date)).size;
+  const g = groupRows(exps);
+  const rows = [
+    ['Report', title], ['Period', period], ['Created', todayStr()], ['Home currency', H], [],
+    ['Metric', H], ['Total spent', n2(t.spend)], [`Per day (${days} days)`, n2(t.spend / days)],
+    ['ATM fees', n2(t.fees)], ['Cash withdrawn', n2(t.cash)], ['Bank markup', n2(t.bank)],
+    ['Expenses', exps.length], [],
+    ['Category', H], ...categoryRows(exps, t).map(r => [r.label, n2(r.value)]), ['Total', n2(t.spend)], [],
+    ['Trip', H], ...g.trips.map(r => [r.label, n2(r.value)]), [],
+    ['Currency', 'Paid', `${H} (market rate)`], ...g.currencies.map(c => [c.cur, n2(c.local), n2(c.home)]),
+  ];
+  download(csv(rows), reportFileName('summary', title));
+  toast('Summary exported');
+});
 
 // ---------- Settings ----------
 
@@ -582,12 +777,7 @@ $('catForm').addEventListener('submit', e => {
 $('refreshRates').addEventListener('click', () => updateRates(true));
 
 $('exportBtn').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `trip-expenses-${todayStr()}.json`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  download(JSON.stringify(state, null, 2), `trip-expenses-${todayStr()}.json`, 'application/json');
 });
 
 $('importFile').addEventListener('change', async e => {
@@ -632,6 +822,7 @@ function renderAll() {
   if ($('view-trips').classList.contains('active')) renderTrips();
   if ($('view-summary').classList.contains('active')) renderSummary();
   if ($('view-reconcile').classList.contains('active')) renderReconcile();
+  if ($('view-report').classList.contains('active')) renderReport();
 }
 
 if (!state.activeTripId && state.trips.length) state.activeTripId = state.trips[0].id;
