@@ -136,3 +136,9 @@ summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
 .rec-input input { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .rec-diff:empty { display: none; }
 .empty { color: var(--muted); text-align: center; padding: 24px 0; }
+.report-table { width: 100%; border-collapse: collapse; font-size: .9rem; margin: 4px 0; }
+.report-table th, .report-table td { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: left; }
+.report-table th { color: var(--muted); font-weight: 600; font-size: .8rem; }
+.report-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.report-table tfoot td { font-weight: 700; border-bottom: none; }
+.report-meta { color: var(--muted); font-size: .85rem; margin: 12px 0 8px; }
