@@ -1,8 +1,20 @@
 # Trip Expenses
 
-A small app for tracking spending on trips, especially abroad. It works offline, converts foreign currencies to your home currency, tracks ATM fees, and totals spend by week, by trip and by category, and exports reports as CSV.
+A small app for tracking spending on trips, especially abroad. It works offline, converts foreign currencies to your home currency, tracks ATM fees, totals spend by week, trip and category, and exports reports as CSV.
 
-All data stays on your device. There are no accounts and no server.
+All data stays on your device. There are no accounts, and nothing you enter leaves the phone.
+
+## Use it on your phone
+
+The app is live at **https://simonh63303.github.io/trip-expenses/**
+
+1. Open that address in Safari (iPhone) or Chrome (Android).
+2. Tap **Share**, then **Add to Home Screen** (on Android: menu, then **Install app**).
+3. Open it from the home screen. After the first visit it works offline.
+
+GitHub Pages publishes whatever is on the `main` branch. Merge a change into `main` and the site updates within a minute or two; the app fetches the new files the next time it opens with a connection.
+
+Each device keeps its own data. To move it, use **Settings → Export backup** on one and **Import backup** on the other.
 
 ## Run it on this computer
 
@@ -47,6 +59,3 @@ When you change `styles.css`, `app.js` or `rates.js`, bump the `?v=` number on i
 | `sw.js` | Service worker: saves the app files so it opens offline |
 | `manifest.json`, `icon.svg` | Let the phone install it like an app |
 
-## Putting it on your phone (later)
-
-A phone can only install the app from an `https://` web address. Free options are GitHub Pages and Netlify (drag and drop the `trip-expenses` folder). Open the address on your phone once, then use "Add to Home Screen".
