@@ -1,7 +1,7 @@
 // Service worker: saves the app's files so it opens without internet.
 // Online it always loads fresh files; offline it uses the last saved copy.
 // When you change styles.css or a .js file, bump the ?v= number in index.html too.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'rates.js', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', e => {

@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <header class="topbar">
@@ -106,6 +106,28 @@
       <div id="reconcileList"></div>
     </section>
 
+    <!-- REPORT -->
+    <section id="view-report" class="view">
+      <h1>Report</h1>
+      <div class="seg" id="reportMode" role="group" aria-label="Report by">
+        <button type="button" data-mode="trip" class="on">By trip</button>
+        <button type="button" data-mode="range">By date range</button>
+      </div>
+      <label id="reportTripWrap">Trip <select id="reportTrip"></select></label>
+      <div id="reportRangeWrap" hidden>
+        <div class="row">
+          <label class="grow">From <input id="reportFrom" type="date"></label>
+          <label class="grow">To <input id="reportTo" type="date"></label>
+        </div>
+        <label>Trip <select id="reportRangeTrip"></select></label>
+      </div>
+      <div class="row actions">
+        <button type="button" id="exportDetailsCsv" class="grow">Export details (CSV)</button>
+        <button type="button" id="exportSummaryCsv" class="grow">Export summary (CSV)</button>
+      </div>
+      <div id="report"></div>
+    </section>
+
     <!-- SETTINGS -->
     <section id="view-settings" class="view">
       <h1>Settings</h1>
@@ -136,12 +158,13 @@
     <button data-view="add" class="on">＋<span>Add</span></button>
     <button data-view="trips">✈<span>Trips</span></button>
     <button data-view="summary">▤<span>Summary</span></button>
+    <button data-view="report">⇩<span>Report</span></button>
     <button data-view="settings">⚙<span>Settings</span></button>
   </nav>
 
   <div id="toast" role="status" aria-live="polite"></div>
 
   <script src="rates.js?v=3"></script>
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

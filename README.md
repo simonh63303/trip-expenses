@@ -1,6 +1,6 @@
 # Trip Expenses
 
-A small app for tracking spending on trips, especially abroad. It works offline, converts foreign currencies to your home currency, tracks ATM fees, and totals spend by week, by trip and by category.
+A small app for tracking spending on trips, especially abroad. It works offline, converts foreign currencies to your home currency, tracks ATM fees, and totals spend by week, by trip and by category, and exports reports as CSV.
 
 All data stays on your device. There are no accounts and no server.
 
@@ -19,6 +19,9 @@ Then open http://localhost:8765.
 - **Trips tab**: create a trip and pick its local currency (e.g. JPY). The active trip is shown at the top.
 - **Add tab**: enter the amount, currency and category. The dollar (home currency) equivalent appears as you type. Choosing **Cash withdrawal** shows an ATM fee field.
 - **Summary tab**: total, per day, ATM fees, cash withdrawn, plus bars by week and by category. Switch between "This trip" and "All trips".
+- **Report tab**: pick a trip (or all trips), or a date range (optionally one trip). It shows totals, spend by category, by trip and by currency, then every expense. Two buttons export it as CSV for a spreadsheet:
+  - **Export details**: one row per expense (date, trip, category, note, amount and currency, rate, home amount, ATM fee, statement amount, bank markup, cost) and a total row.
+  - **Export summary**: the totals and the category, trip and currency tables.
 - **Settings tab**: home currency, refresh rates, add or remove categories, and export or import a backup.
 
 ### Cash and ATM fees
@@ -37,7 +40,7 @@ When you change `styles.css`, `app.js` or `rates.js`, bump the `?v=` number on i
 
 | File | What it does |
 |---|---|
-| `index.html` | The page layout: the four tabs and their forms |
+| `index.html` | The page layout: the five tabs and their forms |
 | `styles.css` | Look and feel, phone-first, light and dark mode |
 | `app.js` | Everything the app does: saving, totals, screens |
 | `rates.js` | Downloading and caching exchange rates |
