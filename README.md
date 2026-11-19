@@ -31,10 +31,10 @@ Then open http://localhost:8765.
 - **Trips tab**: create a trip and pick its local currency (e.g. JPY). The active trip is shown at the top. A built-in **Everyday** trip holds daily, non-trip spending; you can rename it but not delete it.
 - **Add tab**: enter the amount, currency, category and trip. The dollar (home currency) equivalent appears as you type. Choosing **Cash withdrawal** shows an ATM fee field. To move an expense to another trip or category, open it from the Trips tab and change either one.
 - **Summary tab**: total, per day, ATM fees, cash withdrawn, plus bars by week and by category. Switch between "This trip" and "All trips".
-- **Report tab**: pick a trip (or all trips), or a date range (optionally one trip). It shows totals, spend by category, by trip and by currency, then every expense. Two buttons export it as CSV for a spreadsheet:
+- **Report tab**: pick a trip (or all trips), or a date range (optionally one trip). Tap category buttons to limit the report to those categories; **All** clears the filter. It shows totals, spend by category, by trip and by currency, then every expense. Two buttons export it as CSV for a spreadsheet:
   - **Export details**: one row per expense (date, trip, category, note, amount and currency, rate, home amount, ATM fee, statement amount, bank markup, cost) and a total row.
   - **Export summary**: the totals and the category, trip and currency tables.
-- **Settings tab**: home currency, refresh rates, add or remove categories, and export or import a backup.
+- **Settings tab**: home currency, refresh rates, add, rename or remove categories, and export or import a backup. Tap a category to rename it; every expense in it changes too. Renaming to another category's name merges the two. **Cash withdrawal** and **Uncategorized** are built in and can't be renamed.
 
 ### Backups
 Your expenses live only on the device, so back them up. **Settings** shows when you last did. The **Add** tab reminds you when the last backup is 30 or more days old, or when you have 10 or more expenses and have never backed up. **Later** hides the reminder for 7 days.

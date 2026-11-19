@@ -143,6 +143,13 @@ summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
 .report-table tfoot td { font-weight: 700; border-bottom: none; }
 .report-meta { color: var(--muted); font-size: .85rem; margin: 12px 0 8px; }
 
+/* Category buttons: rename in Settings, filter in Report */
+.chips .cat-name { border: none; background: none; min-height: 28px; margin: 0; padding: 0 4px 0 0; color: var(--text); font-size: .9rem; text-decoration: underline dotted var(--muted); text-underline-offset: 3px; }
+.chips .cat-fixed { padding-right: 6px; color: var(--muted); }
+.cat-chips button.on, .cat-chips button.on:hover, .cat-chips button.on:focus-visible { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.report-cats { margin: 10px 0 4px; display: grid; gap: 6px; }
+.report-cats-label { font-size: .9rem; color: var(--muted); }
+
 /* Backup reminder */
 .nudge { background: var(--card); border: 1px solid var(--danger); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
 .nudge p { margin: 0; font-size: .9rem; }
