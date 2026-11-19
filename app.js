@@ -2,7 +2,9 @@
 
 const STORE_KEY = 'tripExpenses.data';
 const CASH = 'Cash withdrawal';
-const DEFAULT_CATEGORIES = ['Food', 'Transport', 'Lodging', 'Activities', 'Shopping', 'eSIM / Phone', CASH, 'Other'];
+const UNCAT = 'Uncategorized'; // where scanned receipts wait until you sort them
+const EVERYDAY = 'everyday';   // id of the built-in trip for daily, non-trip spending
+const DEFAULT_CATEGORIES = ['Food', 'Transport', 'Lodging', 'Activities', 'Shopping', 'eSIM / Phone', CASH, 'Other', UNCAT];
 
 // ---------- Storage ----------
 
@@ -10,12 +12,25 @@ function freshState() {
   return { version: 1, home: 'USD', trips: [], expenses: [], categories: [...DEFAULT_CATEGORIES], activeTripId: null };
 }
 
+// Brings saved data up to date: adds the Everyday trip and the Uncategorized category
+// if they're missing, so data from older versions keeps working.
+function migrate(s) {
+  if (!s.categories.includes(UNCAT)) s.categories.push(UNCAT);
+  if (!s.trips.some(t => t.id === EVERYDAY)) {
+    s.trips.unshift({ id: EVERYDAY, name: 'Everyday', start: '', end: '', currency: s.home, builtin: true });
+  }
+  if (!s.trips.some(t => t.id === s.activeTripId)) {
+    s.activeTripId = (s.trips.find(t => t.id !== EVERYDAY) || s.trips[0]).id;
+  }
+  return s;
+}
+
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY));
-    if (s && Array.isArray(s.trips) && Array.isArray(s.expenses)) return { ...freshState(), ...s };
+    if (s && Array.isArray(s.trips) && Array.isArray(s.expenses)) return migrate({ ...freshState(), ...s });
   } catch {}
-  return freshState();
+  return migrate(freshState());
 }
 
 let state = loadState();
@@ -72,6 +87,12 @@ function fillSelect(sel, values, selected) {
 }
 
 const activeTrip = () => state.trips.find(t => t.id === state.activeTripId) || null;
+const tripById = id => state.trips.find(t => t.id === id) || null;
+
+function tripOptions(selected) {
+  return state.trips.map(t =>
+    `<option value="${t.id}"${t.id === selected ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
+}
 
 // Extra the bank charged beyond the market-rate estimate (only once a statement amount is entered).
 function markup(e) {
@@ -99,10 +120,11 @@ function totals(expenses) {
 
 function showView(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
-  const tab = name === 'reconcile' ? 'summary' : name; // Reconcile lives under Summary
+  const tab = { reconcile: 'summary', sort: 'add' }[name] || name; // sub-screens light up their parent tab
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.view === tab));
   if (name === 'trips') renderTrips();
   if (name === 'reconcile') renderReconcile();
+  if (name === 'sort') renderSort();
   if (name === 'summary') renderSummary();
   if (name === 'settings') renderSettings();
   if (name === 'report') renderReport();
@@ -177,6 +199,11 @@ function toggleFee() { $('feeWrap').hidden = $('category').value !== CASH; updat
 function resetExpenseForm() {
   const trip = activeTrip();
   $('expenseForm').reset();
+  scanned = false;
+  scanStatus('');
+  $('scanDetails').hidden = true;
+  $('scanDetails').open = false;
+  $('expTrip').innerHTML = tripOptions(trip?.id);
   $('editId').value = '';
   $('addTitle').textContent = 'Add expense';
   $('saveBtn').textContent = 'Save expense';
@@ -192,6 +219,9 @@ function renderAddView() {
   const hasTrip = !!activeTrip();
   $('noTripHint').hidden = hasTrip;
   $('expenseForm').hidden = !hasTrip;
+  const n = state.expenses.filter(e => e.category === UNCAT).length;
+  $('sortBanner').hidden = !n;
+  $('sortBanner').textContent = `${n} to sort ›`;
 }
 
 $('amount').addEventListener('input', updateConverted);
@@ -199,11 +229,17 @@ $('atmFee').addEventListener('input', updateConverted);
 $('rate').addEventListener('input', updateConverted);
 $('currency').addEventListener('change', setRateField);
 $('category').addEventListener('change', toggleFee);
+// A new expense takes the chosen trip's currency; an edit keeps its own.
+$('expTrip').addEventListener('change', () => {
+  if ($('editId').value) return;
+  const t = tripById($('expTrip').value);
+  if (t) { $('currency').value = t.currency; setRateField(); }
+});
 $('cancelEdit').addEventListener('click', () => { resetExpenseForm(); showView('trips'); });
 
 $('expenseForm').addEventListener('submit', e => {
   e.preventDefault();
-  const trip = activeTrip();
+  const trip = tripById($('expTrip').value) || activeTrip();
   if (!trip) return;
   const amount = parseFloat($('amount').value);
   const currency = $('currency').value;
@@ -218,7 +254,7 @@ $('expenseForm').addEventListener('submit', e => {
   const statementAmount = old && currency !== state.home ? (old.statementAmount ?? null) : null;
   const expense = {
     id: editId || uid(),
-    tripId: old ? old.tripId : trip.id,
+    tripId: trip.id,
     date: $('date').value,
     amount, currency, category,
     note: $('note').value.trim(),
@@ -232,13 +268,14 @@ $('expenseForm').addEventListener('submit', e => {
   else state.expenses.push(expense);
   save();
 
-  const keepCur = currency, keepCat = category, keepDate = expense.date;
+  const keepCur = currency, keepCat = category, keepDate = expense.date, wasScan = scanned;
   resetExpenseForm();
-  if (!editId) { // keep choices for quick repeat entries
+  if (!editId && !wasScan) { // keep choices for quick repeat entries
     $('currency').value = keepCur; $('category').value = keepCat; $('date').value = keepDate;
     toggleFee(); setRateField();
   }
   toast(editId ? 'Expense updated' : 'Saved · ' + money(expense.homeAmount + expense.homeFee));
+  renderAddView();
   if (editId) showView('trips');
   else $('amount').focus();
 });
@@ -247,6 +284,9 @@ function editExpense(id) {
   const x = state.expenses.find(e => e.id === id);
   if (!x) return;
   showView('add');
+  scanned = false;
+  scanStatus('');
+  $('scanDetails').hidden = true;
   $('editId').value = x.id;
   $('addTitle').textContent = 'Edit expense';
   $('saveBtn').textContent = 'Update expense';
@@ -254,6 +294,7 @@ function editExpense(id) {
   if (!state.categories.includes(x.category)) state.categories.push(x.category);
   fillSelect($('category'), state.categories, x.category);
   fillSelect($('currency'), Rates.currencies(), x.currency);
+  $('expTrip').innerHTML = tripOptions(x.tripId);
   $('amount').value = x.amount;
   $('atmFee').value = x.atmFee || '';
   $('date').value = x.date;
@@ -272,6 +313,255 @@ function deleteExpense(id) {
   renderTrips();
   toast('Expense deleted');
 }
+
+// ---------- Receipt scanning ----------
+// Reading happens on the phone with Tesseract (files in ocr/). They load on the first
+// scan; the service worker then keeps them so later scans work offline.
+
+let scanned = false;          // the form holds values from a scan, not yet saved
+let ocrReady = null;          // promise of the Tesseract worker, created once
+let onOcrProgress = () => {};
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = resolve;
+    el.onerror = () => reject(new Error('Could not load ' + src));
+    document.head.appendChild(el);
+  });
+}
+
+function getOcr() {
+  ocrReady ||= (async () => {
+    if (!window.Tesseract) await loadScript('ocr/tesseract.min.js');
+    const base = new URL('ocr/', location.href).href;
+    return Tesseract.createWorker('eng', 1, {
+      workerPath: base + 'worker.min.js',
+      corePath: base + 'core/',
+      langPath: base + 'lang',
+      workerBlobURL: false, // start the worker from our own file so the service worker can cache what it loads
+      logger: m => onOcrProgress(m),
+    });
+  })().catch(err => { ocrReady = null; throw err; });
+  return ocrReady;
+}
+
+// Shrinks the photo and boosts contrast in greyscale, which helps OCR on phone photos.
+async function prepImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = url;
+    });
+    const scale = Math.min(1, 2000 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * scale);
+    c.height = Math.round(img.naturalHeight * scale);
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    const d = ctx.getImageData(0, 0, c.width, c.height);
+    const px = d.data, hist = new Uint32Array(256);
+    for (let i = 0; i < px.length; i += 4) {
+      const y = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000 | 0;
+      px[i] = y; hist[y]++;
+    }
+    // Stretch so the darkest 2% become black and the lightest 2% white.
+    const total = px.length / 4;
+    let lo = 0, hi = 255, acc = 0;
+    while (lo < 255 && (acc += hist[lo]) < total * 0.02) lo++;
+    acc = 0;
+    while (hi > 0 && (acc += hist[hi]) < total * 0.02) hi--;
+    const range = Math.max(1, hi - lo);
+    for (let i = 0; i < px.length; i += 4) {
+      const v = Math.max(0, Math.min(255, (px[i] - lo) * 255 / range));
+      px[i] = px[i + 1] = px[i + 2] = v;
+    }
+    ctx.putImageData(d, 0, 0);
+    return c;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// ----- Reading the receipt text -----
+
+// Money amounts on a line, e.g. "$1,234.56", "12,50", "1.234,56". Needs two decimals.
+function moneyIn(line) {
+  const out = [], re = /(\d{1,3}(?:[.,\s]\d{3})+|\d+)\s?[.,]\s?(\d{2})(?!\d)/g;
+  let m;
+  while ((m = re.exec(line))) out.push(parseFloat(m[1].replace(/[.,\s]/g, '') + '.' + m[2]));
+  return out.filter(n => n > 0);
+}
+
+function findTotal(lines) {
+  const skip = /sub\s*-?\s*t[o0]tal|tax|tip|change|sav(ed|ings?)|discount|\bitems?\b|qty|\bcash\b|tender|points|rounding/i;
+  const tiers = [
+    /grand\s*t[o0]tal|amount\s*due|balance\s*due|t[o0]tal\s*due|to\s*pay|t[o0]tal\s*amount/i,
+    /t[o0]ta[l1]/i,
+    /amount|\bamt\b|balance|\bsum\b/i,
+  ];
+  for (const tier of tiers) {
+    const found = [];
+    lines.forEach((line, i) => {
+      if (!tier.test(line) || skip.test(line)) return;
+      const here = moneyIn(line);
+      found.push(...(here.length ? here : moneyIn(lines[i + 1] || ''))); // label and amount can sit on separate lines
+    });
+    if (found.length) return Math.max(...found);
+  }
+  const all = lines.filter(l => !skip.test(l)).flatMap(moneyIn);
+  return all.length ? Math.max(...all) : null;
+}
+
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+function findDate(text, today = todayStr()) {
+  const ok = (y, m, d) => {
+    if (y < 100) y += 2000;
+    const dt = new Date(y, m - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+    const s = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const t = parseDate(today);
+    const oldest = new Date(t.getFullYear() - 2, t.getMonth(), t.getDate());
+    return dt <= new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1) && dt >= oldest ? s : null;
+  };
+  const mon = '(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?';
+  const rules = [
+    [/\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b/g, m => ok(+m[1], +m[2], +m[3])],
+    // 1/2/2026 is read month-first (US); if that can't be right (13/2, or a future date), day-first.
+    [/\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{4}|\d{2})\b/g, m => ok(+m[3], +m[1], +m[2]) || ok(+m[3], +m[2], +m[1])],
+    [new RegExp(`\\b${mon}\\s+(\\d{1,2}),?\\s+(\\d{4}|\\d{2})\\b`, 'gi'), m => ok(+m[3], MONTHS.indexOf(m[1].toLowerCase()) + 1, +m[2])],
+    [new RegExp(`\\b(\\d{1,2})\\s+${mon},?\\s+(\\d{4}|\\d{2})\\b`, 'gi'), m => ok(+m[3], MONTHS.indexOf(m[2].toLowerCase()) + 1, +m[1])],
+  ];
+  for (const [re, fn] of rules) {
+    for (const m of text.matchAll(re)) { const d = fn(m); if (d) return d; }
+  }
+  return null;
+}
+
+function findMerchant(lines) {
+  const noise = /receipt|welcome|thank|\btel\b|phone|www\.|http|\.com|date|time|invoice|order|cashier|server|table|guest|^\W*\d/i;
+  for (const line of lines.slice(0, 6)) {
+    const letters = (line.match(/[a-z]/gi) || []).length;
+    if (letters < 3 || letters / line.length < 0.5 || noise.test(line)) continue;
+    let name = line.replace(/[^\p{L}\p{N}&'. -]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (!/[a-z]/.test(name)) name = name.toLowerCase().replace(/(^|[\s-])\p{L}/gu, c => c.toUpperCase()); // TRADER JOE'S -> Trader Joe's
+    if (name.length >= 3) return name;
+  }
+  return '';
+}
+
+function parseReceipt(text, today) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  return { amount: findTotal(lines), date: findDate(text, today), merchant: findMerchant(lines) };
+}
+
+// ----- Scan flow -----
+
+function scanStatus(msg, isError = false) {
+  const el = $('scanStatus');
+  el.hidden = !msg;
+  el.textContent = msg || '';
+  el.classList.toggle('error', isError);
+}
+
+function fillFromScan(r, text) {
+  resetExpenseForm();
+  const everyday = tripById(EVERYDAY);
+  $('expTrip').value = EVERYDAY;
+  fillSelect($('currency'), Rates.currencies(), everyday.currency);
+  fillSelect($('category'), state.categories, UNCAT);
+  $('amount').value = r.amount ?? '';
+  $('date').value = r.date || todayStr();
+  $('note').value = r.merchant;
+  $('scanText').textContent = text.trim() || '(no text found)';
+  $('scanDetails').hidden = false;
+  toggleFee();
+  setRateField();
+  scanned = true;
+  scanStatus(r.amount
+    ? `Found ${money(r.amount, everyday.currency)}${r.date ? '' : ' (no date found, so today is used)'}. Check the details, then Save.`
+    : "Couldn't find the total. Type it in, then Save.");
+  $('amount').focus();
+}
+
+$('scanFile').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (!$('view-add').classList.contains('active')) showView('add');
+  $('scanFile').disabled = true;
+  scanStatus('Getting the receipt reader ready…');
+  onOcrProgress = m => {
+    if (m.status === 'recognizing text') scanStatus(`Reading receipt… ${Math.round(m.progress * 100)}%`);
+    else if (/^loading/.test(m.status || '')) scanStatus('Getting the receipt reader ready (slow the first time)…');
+  };
+  try {
+    let worker;
+    try { worker = await getOcr(); }
+    catch { scanStatus('Could not load the receipt reader. Connect to the internet once so it can download, then try again.', true); return; }
+    const canvas = await prepImage(file);
+    scanStatus('Reading receipt…');
+    const { data } = await worker.recognize(canvas);
+    fillFromScan(parseReceipt(data.text), data.text);
+  } catch {
+    scanStatus('Could not read that photo. Try again in good light, or type the expense in.', true);
+  } finally {
+    $('scanFile').disabled = false;
+    onOcrProgress = () => {};
+  }
+});
+
+// ---------- To sort ----------
+
+function renderSort() {
+  const items = state.expenses.filter(e => e.category === UNCAT).sort((a, b) => b.date.localeCompare(a.date));
+  const cats = state.categories.filter(c => c !== UNCAT && c !== CASH);
+  $('sortList').innerHTML = items.length ? items.map(e => `
+    <div class="list-item sort-row">
+      <div class="sort-top">
+        <div class="main">
+          <div class="title">${esc(e.note || 'Receipt')}</div>
+          <div class="sub">${fmtDate(e.date)} · ${money(e.amount, e.currency)}</div>
+        </div>
+        <button type="button" class="icon-btn" data-sort-edit="${e.id}">Edit</button>
+      </div>
+      <div class="cat-chips" role="group" aria-label="Category for ${esc(e.note || 'receipt')}">
+        ${cats.map(c => `<button type="button" data-file="${e.id}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}
+      </div>
+      <label class="sort-trip">Trip <select data-move="${e.id}">${tripOptions(e.tripId)}</select></label>
+    </div>`).join('')
+    : '<p class="empty">All sorted. Scanned receipts wait here until you pick a category.</p>';
+}
+
+$('sortBanner').addEventListener('click', () => showView('sort'));
+$('sortBack').addEventListener('click', () => { renderAddView(); showView('add'); });
+
+$('sortList').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-file],[data-sort-edit]');
+  if (!b) return;
+  if (b.dataset.sortEdit) { editExpense(b.dataset.sortEdit); return; }
+  const x = state.expenses.find(e => e.id === b.dataset.file);
+  if (!x) return;
+  x.category = b.dataset.cat;
+  save();
+  renderSort();
+  renderAddView();
+  toast(`Filed under ${x.category}`);
+});
+
+$('sortList').addEventListener('change', ev => {
+  const id = ev.target.dataset.move;
+  const x = id && state.expenses.find(e => e.id === id);
+  if (!x) return;
+  x.tripId = ev.target.value;
+  save();
+  toast(`Moved to ${tripById(x.tripId)?.name || 'trip'}`);
+});
 
 // ---------- Trips ----------
 
@@ -323,6 +613,7 @@ function editTrip(id) {
 
 function deleteTrip(id) {
   const t = state.trips.find(x => x.id === id);
+  if (!t || t.builtin) return;
   const n = state.expenses.filter(e => e.tripId === id).length;
   if (!confirm(`Delete "${t.name}" and its ${n} expense(s)? This can't be undone.`)) return;
   state.trips = state.trips.filter(x => x.id !== id);
@@ -341,11 +632,11 @@ function renderTrips() {
     return `<div class="list-item ${t.id === state.activeTripId ? 'active-trip' : ''}">
       <div class="main" data-select="${t.id}" style="cursor:pointer">
         <div class="title">${esc(t.name)}${t.id === state.activeTripId ? ' ✓' : ''}</div>
-        <div class="sub">${esc(t.currency)}${dates ? ' · ' + dates : ''}</div>
+        <div class="sub">${t.builtin ? 'Daily spending · ' : ''}${esc(t.currency)}${dates ? ' · ' + dates : ''}</div>
       </div>
       <div class="amt">${money(spend)}</div>
       <button class="icon-btn" data-edit-trip="${t.id}">Edit</button>
-      <button class="icon-btn danger" data-del-trip="${t.id}" aria-label="Delete trip">✕</button>
+      ${t.builtin ? '' : `<button class="icon-btn danger" data-del-trip="${t.id}" aria-label="Delete trip">✕</button>`}
     </div>`;
   }).join('') : '<p class="empty">No trips yet. Add your first one above.</p>';
 
@@ -733,7 +1024,7 @@ function renderSettings() {
     ? `Last updated ${new Date(info.date).toLocaleString()} (source: open.er-api.com).`
     : 'No rates downloaded yet. Connect to the internet and tap refresh.';
   $('catList').innerHTML = state.categories.map(c =>
-    `<li>${esc(c)}${c === CASH ? '' : `<button data-del-cat="${esc(c)}" aria-label="Remove ${esc(c)}">✕</button>`}</li>`).join('');
+    `<li>${esc(c)}${c === CASH || c === UNCAT ? '' : `<button data-del-cat="${esc(c)}" aria-label="Remove ${esc(c)}">✕</button>`}</li>`).join('');
 }
 
 $('homeCurrency').addEventListener('change', async e => {
@@ -751,6 +1042,7 @@ $('homeCurrency').addEventListener('change', async e => {
     if (x.statementAmount != null) x.statementAmount = round2(x.statementAmount * factor);
     x.rate = x.rate / factor;
   });
+  state.trips.forEach(t => { if (t.builtin && t.currency === oldHome) t.currency = newHome; });
   state.home = newHome;
   save();
   resetExpenseForm();
@@ -760,7 +1052,7 @@ $('homeCurrency').addEventListener('change', async e => {
 
 $('catList').addEventListener('click', e => {
   const c = e.target.dataset.delCat;
-  if (!c) return;
+  if (!c || c === CASH || c === UNCAT) return;
   state.categories = state.categories.filter(x => x !== c);
   save(); renderSettings(); resetExpenseForm();
 });
@@ -770,7 +1062,8 @@ $('catForm').addEventListener('submit', e => {
   const name = $('catName').value.trim();
   if (!name) return;
   if (state.categories.some(c => c.toLowerCase() === name.toLowerCase())) { toast('Already exists'); return; }
-  state.categories.splice(state.categories.length - 1, 0, name); // keep "Other" last
+  const at = state.categories.indexOf('Other'); // new categories go before "Other"
+  state.categories.splice(at < 0 ? state.categories.length : at, 0, name);
   save(); $('catName').value = ''; renderSettings(); resetExpenseForm();
 });
 
@@ -788,7 +1081,7 @@ $('importFile').addEventListener('change', async e => {
     const data = JSON.parse(await file.text());
     if (!Array.isArray(data.trips) || !Array.isArray(data.expenses)) throw new Error();
     if (!confirm(`Replace current data with backup (${data.trips.length} trips, ${data.expenses.length} expenses)?`)) return;
-    state = { ...freshState(), ...data };
+    state = migrate({ ...freshState(), ...data });
     save(); resetTripForm(); resetExpenseForm(); renderAll(); renderSettings();
     toast('Backup restored');
   } catch { toast('That file is not a valid backup'); }
@@ -822,14 +1115,13 @@ function renderAll() {
   if ($('view-trips').classList.contains('active')) renderTrips();
   if ($('view-summary').classList.contains('active')) renderSummary();
   if ($('view-reconcile').classList.contains('active')) renderReconcile();
+  if ($('view-sort').classList.contains('active')) renderSort();
   if ($('view-report').classList.contains('active')) renderReport();
 }
 
-if (!state.activeTripId && state.trips.length) state.activeTripId = state.trips[0].id;
 resetTripForm();
 resetExpenseForm();
 renderAll();
-if (!state.trips.length) showView('trips');
 updateRates(false);
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

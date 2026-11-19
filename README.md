@@ -28,13 +28,21 @@ Then open http://localhost:8765.
 
 ## How it works
 
-- **Trips tab**: create a trip and pick its local currency (e.g. JPY). The active trip is shown at the top.
-- **Add tab**: enter the amount, currency and category. The dollar (home currency) equivalent appears as you type. Choosing **Cash withdrawal** shows an ATM fee field.
+- **Trips tab**: create a trip and pick its local currency (e.g. JPY). The active trip is shown at the top. A built-in **Everyday** trip holds daily, non-trip spending; you can rename it but not delete it.
+- **Add tab**: enter the amount, currency, category and trip. The dollar (home currency) equivalent appears as you type. Choosing **Cash withdrawal** shows an ATM fee field. To move an expense to another trip or category, open it from the Trips tab and change either one.
 - **Summary tab**: total, per day, ATM fees, cash withdrawn, plus bars by week and by category. Switch between "This trip" and "All trips".
 - **Report tab**: pick a trip (or all trips), or a date range (optionally one trip). It shows totals, spend by category, by trip and by currency, then every expense. Two buttons export it as CSV for a spreadsheet:
   - **Export details**: one row per expense (date, trip, category, note, amount and currency, rate, home amount, ATM fee, statement amount, bank markup, cost) and a total row.
   - **Export summary**: the totals and the category, trip and currency tables.
 - **Settings tab**: home currency, refresh rates, add or remove categories, and export or import a backup.
+
+### Scanning receipts
+Tap **Scan receipt** on the Add tab and take or pick a photo. The phone reads it with Tesseract (no server, nothing leaves the device) and fills in the total, date and shop name. Check them, fix anything it misread, and tap **Save**. **What the scanner read** shows the raw text if you want to see where a number came from.
+
+- Scans go to the **Everyday** trip, in the **Uncategorized** category. A **"3 to sort"** button then appears on the Add tab; it opens **To sort**, where one tap files each receipt under a category, and a picker moves it to a trip.
+- The total comes from a line like "Total" or "Amount due", never "Subtotal", "Tax" or "Change". With no such line, the largest amount is used.
+- Dates like 03/04/2026 are read month-first (US), unless that gives an impossible or future date.
+- The first scan downloads the reader (about 7 MB). After that, scanning works offline. The photo itself is not kept.
 
 ### Cash and ATM fees
 The withdrawn cash is **not** counted as spending, because you log what you buy with it. The ATM fee **is** counted. This avoids counting the same money twice.
@@ -58,4 +66,5 @@ When you change `styles.css`, `app.js` or `rates.js`, bump the `?v=` number on i
 | `rates.js` | Downloading and caching exchange rates |
 | `sw.js` | Service worker: saves the app files so it opens offline |
 | `manifest.json`, `icon.svg` | Let the phone install it like an app |
+| `ocr/` | Receipt reader (Tesseract), loaded on the first scan; see `ocr/README.md` |
 

@@ -142,3 +142,19 @@ summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
 .report-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .report-table tfoot td { font-weight: 700; border-bottom: none; }
 .report-meta { color: var(--muted); font-size: .85rem; margin: 12px 0 8px; }
+
+/* Receipt scanning and the To sort screen */
+.scan-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.scan-btn { flex: 1; min-width: 0; border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.scan-btn:has(input:disabled) { opacity: .6; cursor: progress; }
+.sort-banner { margin-top: 4px; border-color: var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.scan-status { margin: 8px 0 0; font-size: .9rem; color: var(--accent); }
+.scan-status.error { color: var(--danger); }
+.scan-text { white-space: pre-wrap; font-size: .8rem; color: var(--muted); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px; max-height: 14em; overflow: auto; margin: 6px 0 0; }
+.sort-row { flex-direction: column; align-items: stretch; gap: 8px; }
+.sort-top { display: flex; align-items: center; gap: 10px; }
+.cat-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-chips button { min-height: 36px; margin: 0; padding: 4px 12px; border-radius: 999px; font-size: .85rem; }
+.cat-chips button:hover, .cat-chips button:focus-visible { border-color: var(--accent); color: var(--accent); }
+.sort-trip { margin: 0; display: flex; align-items: center; gap: 8px; }
+.sort-trip select { margin: 0; flex: 1; min-height: 36px; padding: 4px 8px; }
