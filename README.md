@@ -36,6 +36,11 @@ Then open http://localhost:8765.
   - **Export summary**: the totals and the category, trip and currency tables.
 - **Settings tab**: home currency, refresh rates, add or remove categories, and export or import a backup.
 
+### Backups
+Your expenses live only on the device, so back them up. **Settings** shows when you last did. The **Add** tab reminds you when the last backup is 30 or more days old, or when you have 10 or more expenses and have never backed up. **Later** hides the reminder for 7 days.
+
+In the home-screen app, **Export backup** (and the CSV exports) open the Share sheet, because home-screen apps on phones often ignore downloads. Choose **Save to Files**, AirDrop or Mail. In a browser tab, the file downloads as usual. Cancelling the Share sheet doesn't count as a backup.
+
 ### Scanning receipts
 Tap **Scan receipt** on the Add tab and take or pick a photo. The phone reads it with Tesseract (no server, nothing leaves the device) and fills in the total, date and shop name. Check them, fix anything it misread, and tap **Save**. **What the scanner read** shows the raw text if you want to see where a number came from.
 

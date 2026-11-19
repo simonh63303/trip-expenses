@@ -143,6 +143,13 @@ summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
 .report-table tfoot td { font-weight: 700; border-bottom: none; }
 .report-meta { color: var(--muted); font-size: .85rem; margin: 12px 0 8px; }
 
+/* Backup reminder */
+.nudge { background: var(--card); border: 1px solid var(--danger); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.nudge p { margin: 0; font-size: .9rem; }
+.nudge .row { margin-top: 4px; }
+.backup-info { margin: 6px 0; font-size: .9rem; }
+.backup-info.due { color: var(--danger); font-weight: 600; }
+
 /* Receipt scanning and the To sort screen */
 .scan-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .scan-btn { flex: 1; min-width: 0; border-color: var(--accent); color: var(--accent); font-weight: 600; }

@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
   <header class="topbar">
@@ -24,6 +24,13 @@
     <section id="view-add" class="view active">
       <h1 id="addTitle">Add expense</h1>
       <p id="noTripHint" class="hint" hidden>Create a trip first on the <b>Trips</b> tab.</p>
+      <div id="backupNudge" class="nudge" role="status" hidden>
+        <p id="backupNudgeText"></p>
+        <div class="row">
+          <button type="button" id="nudgeBackup" class="primary grow">Back up now</button>
+          <button type="button" id="nudgeLater">Later</button>
+        </div>
+      </div>
       <div class="scan-bar">
         <label class="button scan-btn" id="scanBtn">📷 Scan receipt<input id="scanFile" type="file" accept="image/*" hidden></label>
         <button type="button" id="sortBanner" class="sort-banner" hidden></button>
@@ -170,6 +177,7 @@
 
       <h2>Backup</h2>
       <p class="hint">Your data lives only on this device. Export a backup now and then.</p>
+      <p id="backupInfo" class="backup-info"></p>
       <div class="row">
         <button type="button" id="exportBtn" class="grow">Export backup</button>
         <label class="button grow">Import backup<input id="importFile" type="file" accept="application/json" hidden></label>
@@ -188,6 +196,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
 
   <script src="rates.js?v=3"></script>
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

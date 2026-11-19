@@ -219,6 +219,7 @@ function renderAddView() {
   const hasTrip = !!activeTrip();
   $('noTripHint').hidden = hasTrip;
   $('expenseForm').hidden = !hasTrip;
+  renderBackupNudge();
   const n = state.expenses.filter(e => e.category === UNCAT).length;
   $('sortBanner').hidden = !n;
   $('sortBanner').textContent = `${n} to sort ›`;
@@ -968,20 +969,31 @@ const csv = rows => '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\
 const n2 = n => n == null ? '' : round2(n).toFixed(2);
 const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'report';
 
-function download(text, name, type = 'text/csv;charset=utf-8') {
+// Saves a file. In the home-screen app, phones often ignore downloads, so it opens the
+// Share sheet (Save to Files, AirDrop, Mail) instead. Resolves false if the person cancels.
+async function download(text, name, type = 'text/csv;charset=utf-8') {
   const blob = new Blob([text], { type });
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if (standalone && navigator.canShare) {
+    const file = new File([blob], name, { type });
+    if (navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return true; }
+      catch (err) { if (err.name === 'AbortError') return false; } // other errors: fall back to a download
+    }
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  return true;
 }
 
 function reportFileName(kind, title) {
   return `${slug(title)}-${kind}-${todayStr()}.csv`;
 }
 
-$('exportDetailsCsv').addEventListener('click', () => {
+$('exportDetailsCsv').addEventListener('click', async () => {
   const { exps, title } = reportData();
   const H = state.home;
   const rows = [['Date', 'Trip', 'Category', 'Note', 'Amount', 'Currency', `Rate (per 1 ${H})`, `Amount (${H})`,
@@ -992,11 +1004,10 @@ $('exportDetailsCsv').addEventListener('click', () => {
       e.statementAmount != null ? n2(markup(e)) : '', n2(cost(e))]);
   }
   rows.push(['Total', '', '', '', '', '', '', '', '', '', '', '', n2(totals(exps).spend)]);
-  download(csv(rows), reportFileName('details', title));
-  toast(`Exported ${exps.length} expenses`);
+  if (await download(csv(rows), reportFileName('details', title))) toast(`Exported ${exps.length} expenses`);
 });
 
-$('exportSummaryCsv').addEventListener('click', () => {
+$('exportSummaryCsv').addEventListener('click', async () => {
   const { exps, title, period } = reportData();
   const H = state.home;
   const t = totals(exps);
@@ -1011,14 +1022,14 @@ $('exportSummaryCsv').addEventListener('click', () => {
     ['Trip', H], ...g.trips.map(r => [r.label, n2(r.value)]), [],
     ['Currency', 'Paid', `${H} (market rate)`], ...g.currencies.map(c => [c.cur, n2(c.local), n2(c.home)]),
   ];
-  download(csv(rows), reportFileName('summary', title));
-  toast('Summary exported');
+  if (await download(csv(rows), reportFileName('summary', title))) toast('Summary exported');
 });
 
 // ---------- Settings ----------
 
 function renderSettings() {
   fillSelect($('homeCurrency'), Rates.currencies(), state.home);
+  renderBackupInfo();
   const info = Rates.info;
   $('rateInfo').textContent = info
     ? `Last updated ${new Date(info.date).toLocaleString()} (source: open.er-api.com).`
@@ -1069,8 +1080,63 @@ $('catForm').addEventListener('submit', e => {
 
 $('refreshRates').addEventListener('click', () => updateRates(true));
 
-$('exportBtn').addEventListener('click', () => {
-  download(JSON.stringify(state, null, 2), `trip-expenses-${todayStr()}.json`, 'application/json');
+// ---------- Backup reminder ----------
+
+const BACKUP_EVERY = 30;   // days between backups before the Add tab reminds you
+const NEVER_MIN = 10;      // with no backup yet, remind once there are this many expenses
+const SNOOZE_DAYS = 7;
+
+const daysBetween = (a, b) => Math.round((parseDate(b) - parseDate(a)) / 86400000);
+
+function addDays(s, n) {
+  const d = parseDate(s);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Whether a backup is overdue, and a sentence saying so.
+function backupStatus(today = todayStr()) {
+  const n = state.expenses.length;
+  if (!state.lastBackup) {
+    return { due: n >= NEVER_MIN, text: n ? `Never backed up. ${n} expense${n > 1 ? 's' : ''} exist only on this device.` : 'Never backed up.' };
+  }
+  const days = daysBetween(state.lastBackup, today);
+  const when = days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
+  return { due: n > 0 && days >= BACKUP_EVERY, days, text: `Last backup ${when} (${fmtDate(state.lastBackup, { month: 'short', day: 'numeric', year: 'numeric' })}).` };
+}
+
+function renderBackupNudge() {
+  const b = backupStatus();
+  const snoozed = state.backupSnoozeUntil && todayStr() < state.backupSnoozeUntil;
+  $('backupNudge').hidden = !b.due || snoozed;
+  $('backupNudgeText').textContent = state.lastBackup
+    ? `Your last backup was ${b.days} days ago. Your expenses live only on this phone.`
+    : `You haven't backed up yet, and your ${state.expenses.length} expenses live only on this phone.`;
+}
+
+function renderBackupInfo() {
+  const b = backupStatus();
+  $('backupInfo').textContent = b.text;
+  $('backupInfo').classList.toggle('due', b.due);
+}
+
+async function backup() {
+  const ok = await download(JSON.stringify(state, null, 2), `trip-expenses-${todayStr()}.json`, 'application/json');
+  if (!ok) return; // cancelled, so the reminder stays
+  state.lastBackup = todayStr();
+  delete state.backupSnoozeUntil;
+  save();
+  renderBackupNudge();
+  renderBackupInfo();
+  toast('Backup saved');
+}
+
+$('exportBtn').addEventListener('click', backup);
+$('nudgeBackup').addEventListener('click', backup);
+$('nudgeLater').addEventListener('click', () => {
+  state.backupSnoozeUntil = addDays(todayStr(), SNOOZE_DAYS);
+  save();
+  renderBackupNudge();
 });
 
 $('importFile').addEventListener('change', async e => {
