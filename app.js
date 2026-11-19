@@ -219,6 +219,7 @@ function renderAddView() {
   const hasTrip = !!activeTrip();
   $('noTripHint').hidden = hasTrip;
   $('expenseForm').hidden = !hasTrip;
+  renderBackupNudge();
   const n = state.expenses.filter(e => e.category === UNCAT).length;
   $('sortBanner').hidden = !n;
   $('sortBanner').textContent = `${n} to sort ›`;
@@ -489,12 +490,13 @@ function fillFromScan(r, text) {
   $('amount').focus();
 }
 
-$('scanFile').addEventListener('change', async e => {
+// Two ways in: the camera, or a photo already taken. Both run the same scan.
+async function scanPicked(e) {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
   if (!$('view-add').classList.contains('active')) showView('add');
-  $('scanFile').disabled = true;
+  $('scanCamera').disabled = $('scanFile').disabled = true;
   scanStatus('Getting the receipt reader ready…');
   onOcrProgress = m => {
     if (m.status === 'recognizing text') scanStatus(`Reading receipt… ${Math.round(m.progress * 100)}%`);
@@ -511,10 +513,12 @@ $('scanFile').addEventListener('change', async e => {
   } catch {
     scanStatus('Could not read that photo. Try again in good light, or type the expense in.', true);
   } finally {
-    $('scanFile').disabled = false;
+    $('scanCamera').disabled = $('scanFile').disabled = false;
     onOcrProgress = () => {};
   }
-});
+}
+$('scanCamera').addEventListener('change', scanPicked);
+$('scanFile').addEventListener('change', scanPicked);
 
 // ---------- To sort ----------
 
@@ -828,7 +832,7 @@ function renderSummary() {
 // ---------- Report ----------
 
 const ALL = '__all';
-const report = { mode: 'trip', tripId: null, rangeTripId: ALL, from: '', to: '' };
+const report = { mode: 'trip', tripId: null, rangeTripId: ALL, from: '', to: '', cats: null }; // cats: null means all
 
 const tripName = id => state.trips.find(t => t.id === id)?.name || '';
 
@@ -859,7 +863,13 @@ function reportData() {
   }
   exps = [...exps].sort((a, b) => a.date.localeCompare(b.date));
   if (!period && exps.length) period = `${exps[0].date} to ${exps[exps.length - 1].date}`;
-  return { exps, title, period: period || '' };
+  // Categories found before filtering, in Settings order, so the buttons don't vanish as you pick.
+  const found = new Set(exps.map(e => e.category));
+  const order = [...state.categories, ...found];
+  const cats = [...new Set(order)].filter(c => found.has(c) || report.cats?.includes(c));
+  if (report.cats) exps = exps.filter(e => report.cats.includes(e.category));
+  const catLabel = report.cats ? report.cats.join(', ') : 'All categories';
+  return { exps, title, period: period || '', cats, catLabel };
 }
 
 // Totals grouped by trip and by original currency.
@@ -895,7 +905,9 @@ function renderReport() {
   $('reportRangeWrap').hidden = report.mode !== 'range';
   document.querySelectorAll('#reportMode button').forEach(b => b.classList.toggle('on', b.dataset.mode === report.mode));
 
-  const { exps, title, period } = reportData();
+  const { exps, title, period, cats, catLabel } = reportData();
+  $('reportCats').innerHTML = [`<button type="button" data-rcat="" aria-pressed="${!report.cats}"${report.cats ? '' : ' class="on"'}>All</button>`,
+    ...cats.map(c => { const on = !!report.cats?.includes(c); return `<button type="button" data-rcat="${esc(c)}" aria-pressed="${on}"${on ? ' class="on"' : ''}>${esc(c)}</button>`; })].join('');
   const el = $('report');
   $('exportDetailsCsv').disabled = $('exportSummaryCsv').disabled = !exps.length;
   if (!exps.length) { el.innerHTML = '<p class="empty">No expenses match this report.</p>'; return; }
@@ -905,7 +917,7 @@ function renderReport() {
   const multiTrip = new Set(exps.map(e => e.tripId)).size > 1;
   const g = groupRows(exps);
 
-  let html = `<p class="report-meta"><b>${esc(title)}</b>${period ? ' · ' + esc(period) : ''} · ${exps.length} expense${exps.length > 1 ? 's' : ''}</p>
+  let html = `<p class="report-meta"><b>${esc(title)}</b>${period ? ' · ' + esc(period) : ''}${report.cats ? ' · ' + esc(catLabel) : ''} · ${exps.length} expense${exps.length > 1 ? 's' : ''}</p>
   <div class="stats">
     <div class="stat"><div class="label">Total spent</div><div class="value">${money(t.spend)}</div></div>
     <div class="stat"><div class="label">Per day (${days} day${days > 1 ? 's' : ''})</div><div class="value">${money(t.spend / days)}</div></div>
@@ -951,6 +963,19 @@ document.querySelectorAll('#reportMode button').forEach(b => b.addEventListener(
   }
   renderReport();
 }));
+// Tap a category to add or remove it; "All" clears the filter.
+$('reportCats').addEventListener('click', e => {
+  const b = e.target.closest('[data-rcat]');
+  if (!b) return;
+  const c = b.dataset.rcat;
+  if (!c) report.cats = null;
+  else {
+    const set = new Set(report.cats || []);
+    set.has(c) ? set.delete(c) : set.add(c);
+    report.cats = set.size ? [...set] : null;
+  }
+  renderReport();
+});
 $('reportTrip').addEventListener('change', e => { report.tripId = e.target.value; renderReport(); });
 $('reportRangeTrip').addEventListener('change', e => { report.rangeTripId = e.target.value; renderReport(); });
 $('reportFrom').addEventListener('change', e => { report.from = e.target.value; renderReport(); });
@@ -968,20 +993,31 @@ const csv = rows => '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\
 const n2 = n => n == null ? '' : round2(n).toFixed(2);
 const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'report';
 
-function download(text, name, type = 'text/csv;charset=utf-8') {
+// Saves a file. In the home-screen app, phones often ignore downloads, so it opens the
+// Share sheet (Save to Files, AirDrop, Mail) instead. Resolves false if the person cancels.
+async function download(text, name, type = 'text/csv;charset=utf-8') {
   const blob = new Blob([text], { type });
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if (standalone && navigator.canShare) {
+    const file = new File([blob], name, { type });
+    if (navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return true; }
+      catch (err) { if (err.name === 'AbortError') return false; } // other errors: fall back to a download
+    }
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  return true;
 }
 
 function reportFileName(kind, title) {
   return `${slug(title)}-${kind}-${todayStr()}.csv`;
 }
 
-$('exportDetailsCsv').addEventListener('click', () => {
+$('exportDetailsCsv').addEventListener('click', async () => {
   const { exps, title } = reportData();
   const H = state.home;
   const rows = [['Date', 'Trip', 'Category', 'Note', 'Amount', 'Currency', `Rate (per 1 ${H})`, `Amount (${H})`,
@@ -992,18 +1028,17 @@ $('exportDetailsCsv').addEventListener('click', () => {
       e.statementAmount != null ? n2(markup(e)) : '', n2(cost(e))]);
   }
   rows.push(['Total', '', '', '', '', '', '', '', '', '', '', '', n2(totals(exps).spend)]);
-  download(csv(rows), reportFileName('details', title));
-  toast(`Exported ${exps.length} expenses`);
+  if (await download(csv(rows), reportFileName('details', title))) toast(`Exported ${exps.length} expenses`);
 });
 
-$('exportSummaryCsv').addEventListener('click', () => {
-  const { exps, title, period } = reportData();
+$('exportSummaryCsv').addEventListener('click', async () => {
+  const { exps, title, period, catLabel } = reportData();
   const H = state.home;
   const t = totals(exps);
   const days = new Set(exps.map(e => e.date)).size;
   const g = groupRows(exps);
   const rows = [
-    ['Report', title], ['Period', period], ['Created', todayStr()], ['Home currency', H], [],
+    ['Report', title], ['Period', period], ['Categories', catLabel], ['Created', todayStr()], ['Home currency', H], [],
     ['Metric', H], ['Total spent', n2(t.spend)], [`Per day (${days} days)`, n2(t.spend / days)],
     ['ATM fees', n2(t.fees)], ['Cash withdrawn', n2(t.cash)], ['Bank markup', n2(t.bank)],
     ['Expenses', exps.length], [],
@@ -1011,20 +1046,22 @@ $('exportSummaryCsv').addEventListener('click', () => {
     ['Trip', H], ...g.trips.map(r => [r.label, n2(r.value)]), [],
     ['Currency', 'Paid', `${H} (market rate)`], ...g.currencies.map(c => [c.cur, n2(c.local), n2(c.home)]),
   ];
-  download(csv(rows), reportFileName('summary', title));
-  toast('Summary exported');
+  if (await download(csv(rows), reportFileName('summary', title))) toast('Summary exported');
 });
 
 // ---------- Settings ----------
 
 function renderSettings() {
   fillSelect($('homeCurrency'), Rates.currencies(), state.home);
+  renderBackupInfo();
   const info = Rates.info;
   $('rateInfo').textContent = info
     ? `Last updated ${new Date(info.date).toLocaleString()} (source: open.er-api.com).`
     : 'No rates downloaded yet. Connect to the internet and tap refresh.';
   $('catList').innerHTML = state.categories.map(c =>
-    `<li>${esc(c)}${c === CASH || c === UNCAT ? '' : `<button data-del-cat="${esc(c)}" aria-label="Remove ${esc(c)}">✕</button>`}</li>`).join('');
+    c === CASH || c === UNCAT
+      ? `<li><span class="cat-fixed" title="Built in, can't be renamed">${esc(c)}</span></li>`
+      : `<li><button type="button" class="cat-name" data-rename-cat="${esc(c)}">${esc(c)}</button><button data-del-cat="${esc(c)}" aria-label="Remove ${esc(c)}">✕</button></li>`).join('');
 }
 
 $('homeCurrency').addEventListener('change', async e => {
@@ -1050,7 +1087,46 @@ $('homeCurrency').addEventListener('change', async e => {
   updateRates(true);
 });
 
+// ----- Rename or merge a category -----
+
+function openRename(c) {
+  const n = state.expenses.filter(e => e.category === c).length;
+  $('renameFrom').textContent = c;
+  $('renameTo').value = c;
+  $('renameHint').textContent = `${n} expense${n === 1 ? '' : 's'} use this category and will change too. Use another category's name to merge them.`;
+  $('catRename').hidden = false;
+  $('renameTo').focus();
+  $('renameTo').select();
+}
+
+function renameCategory(from, to) {
+  to = to.trim();
+  if (!to || to === from) return true;
+  const other = state.categories.find(c => c !== from && c.toLowerCase() === to.toLowerCase());
+  if (other === CASH || other === UNCAT) { toast(`${other} is built in. Pick another name.`); return false; }
+  const n = state.expenses.filter(e => e.category === from).length;
+  const target = other || to;
+  if (other && !confirm(`Merge "${from}" into "${other}"? ${n} expense${n === 1 ? '' : 's'} will move to ${other}.`)) return false;
+  state.expenses.forEach(e => { if (e.category === from) e.category = target; });
+  state.categories = other ? state.categories.filter(c => c !== from) : state.categories.map(c => c === from ? to : c);
+  if (report.cats) report.cats = [...new Set(report.cats.map(c => c === from ? target : c))];
+  save();
+  toast(other ? `Merged into ${other}` : `Renamed to ${to}${n ? ` · ${n} expense${n === 1 ? '' : 's'} updated` : ''}`);
+  return true;
+}
+
+$('catRename').addEventListener('submit', e => {
+  e.preventDefault();
+  if (!renameCategory($('renameFrom').textContent, $('renameTo').value)) return;
+  $('catRename').hidden = true;
+  renderSettings();
+  resetExpenseForm();
+  renderAddView();
+});
+$('renameCancel').addEventListener('click', () => { $('catRename').hidden = true; });
+
 $('catList').addEventListener('click', e => {
+  if (e.target.dataset.renameCat) { openRename(e.target.dataset.renameCat); return; }
   const c = e.target.dataset.delCat;
   if (!c || c === CASH || c === UNCAT) return;
   state.categories = state.categories.filter(x => x !== c);
@@ -1069,8 +1145,63 @@ $('catForm').addEventListener('submit', e => {
 
 $('refreshRates').addEventListener('click', () => updateRates(true));
 
-$('exportBtn').addEventListener('click', () => {
-  download(JSON.stringify(state, null, 2), `trip-expenses-${todayStr()}.json`, 'application/json');
+// ---------- Backup reminder ----------
+
+const BACKUP_EVERY = 30;   // days between backups before the Add tab reminds you
+const NEVER_MIN = 10;      // with no backup yet, remind once there are this many expenses
+const SNOOZE_DAYS = 7;
+
+const daysBetween = (a, b) => Math.round((parseDate(b) - parseDate(a)) / 86400000);
+
+function addDays(s, n) {
+  const d = parseDate(s);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Whether a backup is overdue, and a sentence saying so.
+function backupStatus(today = todayStr()) {
+  const n = state.expenses.length;
+  if (!state.lastBackup) {
+    return { due: n >= NEVER_MIN, text: n ? `Never backed up. ${n} expense${n > 1 ? 's' : ''} exist only on this device.` : 'Never backed up.' };
+  }
+  const days = daysBetween(state.lastBackup, today);
+  const when = days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
+  return { due: n > 0 && days >= BACKUP_EVERY, days, text: `Last backup ${when} (${fmtDate(state.lastBackup, { month: 'short', day: 'numeric', year: 'numeric' })}).` };
+}
+
+function renderBackupNudge() {
+  const b = backupStatus();
+  const snoozed = state.backupSnoozeUntil && todayStr() < state.backupSnoozeUntil;
+  $('backupNudge').hidden = !b.due || snoozed;
+  $('backupNudgeText').textContent = state.lastBackup
+    ? `Your last backup was ${b.days} days ago. Your expenses live only on this phone.`
+    : `You haven't backed up yet, and your ${state.expenses.length} expenses live only on this phone.`;
+}
+
+function renderBackupInfo() {
+  const b = backupStatus();
+  $('backupInfo').textContent = b.text;
+  $('backupInfo').classList.toggle('due', b.due);
+}
+
+async function backup() {
+  const ok = await download(JSON.stringify(state, null, 2), `trip-expenses-${todayStr()}.json`, 'application/json');
+  if (!ok) return; // cancelled, so the reminder stays
+  state.lastBackup = todayStr();
+  delete state.backupSnoozeUntil;
+  save();
+  renderBackupNudge();
+  renderBackupInfo();
+  toast('Backup saved');
+}
+
+$('exportBtn').addEventListener('click', backup);
+$('nudgeBackup').addEventListener('click', backup);
+$('nudgeLater').addEventListener('click', () => {
+  state.backupSnoozeUntil = addDays(todayStr(), SNOOZE_DAYS);
+  save();
+  renderBackupNudge();
 });
 
 $('importFile').addEventListener('change', async e => {

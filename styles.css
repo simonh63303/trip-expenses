@@ -143,10 +143,26 @@ summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
 .report-table tfoot td { font-weight: 700; border-bottom: none; }
 .report-meta { color: var(--muted); font-size: .85rem; margin: 12px 0 8px; }
 
+/* Category buttons: rename in Settings, filter in Report */
+.chips .cat-name { border: none; background: none; min-height: 28px; margin: 0; padding: 0 4px 0 0; color: var(--text); font-size: .9rem; text-decoration: underline dotted var(--muted); text-underline-offset: 3px; }
+.chips .cat-fixed { padding-right: 6px; color: var(--muted); }
+.cat-chips button.on, .cat-chips button.on:hover, .cat-chips button.on:focus-visible { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.report-cats { margin: 10px 0 4px; display: grid; gap: 6px; }
+.report-cats-label { font-size: .9rem; color: var(--muted); }
+
+/* Backup reminder */
+.nudge { background: var(--card); border: 1px solid var(--danger); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.nudge p { margin: 0; font-size: .9rem; }
+.nudge .row { margin-top: 4px; }
+.backup-info { margin: 6px 0; font-size: .9rem; }
+.backup-info.due { color: var(--danger); font-weight: 600; }
+
 /* Receipt scanning and the To sort screen */
 .scan-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .scan-btn { flex: 1; min-width: 0; border-color: var(--accent); color: var(--accent); font-weight: 600; }
-.scan-btn:has(input:disabled) { opacity: .6; cursor: progress; }
+.scan-pick { flex: 0 0 auto; }
+.scan-btn:has(input:disabled), .scan-pick:has(input:disabled) { opacity: .6; cursor: progress; }
+.sort-banner { flex-basis: 100%; }
 .sort-banner { margin-top: 4px; border-color: var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 600; }
 .scan-status { margin: 8px 0 0; font-size: .9rem; color: var(--accent); }
 .scan-status.error { color: var(--danger); }
