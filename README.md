@@ -42,7 +42,7 @@ Your expenses live only on the device, so back them up. **Settings** shows when 
 In the home-screen app, **Export backup** (and the CSV exports) open the Share sheet, because home-screen apps on phones often ignore downloads. Choose **Save to Files**, AirDrop or Mail. In a browser tab, the file downloads as usual. Cancelling the Share sheet doesn't count as a backup.
 
 ### Scanning receipts
-Tap **Scan receipt** on the Add tab and take or pick a photo. The phone reads it with Tesseract (no server, nothing leaves the device) and fills in the total, date and shop name. Check them, fix anything it misread, and tap **Save**. **What the scanner read** shows the raw text if you want to see where a number came from.
+Tap **Scan receipt** on the Add tab to open the camera, or **From photos** to use a picture you already took. The phone reads it with Tesseract (no server, nothing leaves the device) and fills in the total, date and shop name. Check them, fix anything it misread, and tap **Save**. **What the scanner read** shows the raw text if you want to see where a number came from.
 
 - Scans go to the **Everyday** trip, in the **Uncategorized** category. A **"3 to sort"** button then appears on the Add tab; it opens **To sort**, where one tap files each receipt under a category, and a picker moves it to a trip.
 - The total comes from a line like "Total" or "Amount due", never "Subtotal", "Tax" or "Change". With no such line, the largest amount is used.

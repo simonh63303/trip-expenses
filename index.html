@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="stylesheet" href="styles.css?v=8">
+  <link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body>
   <header class="topbar">
@@ -32,7 +32,9 @@
         </div>
       </div>
       <div class="scan-bar">
-        <label class="button scan-btn" id="scanBtn">📷 Scan receipt<input id="scanFile" type="file" accept="image/*" hidden></label>
+        <!-- capture opens the camera directly; without it, newer Android phones only show the photo picker -->
+        <label class="button scan-btn" id="scanBtn">📷 Scan receipt<input id="scanCamera" type="file" accept="image/*" capture="environment" hidden></label>
+        <label class="button scan-pick" id="scanPickBtn">From photos<input id="scanFile" type="file" accept="image/*" hidden></label>
         <button type="button" id="sortBanner" class="sort-banner" hidden></button>
       </div>
       <p id="scanStatus" class="scan-status" role="status" hidden></p>
@@ -211,6 +213,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
 
   <script src="rates.js?v=3"></script>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

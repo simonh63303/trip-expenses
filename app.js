@@ -490,12 +490,13 @@ function fillFromScan(r, text) {
   $('amount').focus();
 }
 
-$('scanFile').addEventListener('change', async e => {
+// Two ways in: the camera, or a photo already taken. Both run the same scan.
+async function scanPicked(e) {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
   if (!$('view-add').classList.contains('active')) showView('add');
-  $('scanFile').disabled = true;
+  $('scanCamera').disabled = $('scanFile').disabled = true;
   scanStatus('Getting the receipt reader ready…');
   onOcrProgress = m => {
     if (m.status === 'recognizing text') scanStatus(`Reading receipt… ${Math.round(m.progress * 100)}%`);
@@ -512,10 +513,12 @@ $('scanFile').addEventListener('change', async e => {
   } catch {
     scanStatus('Could not read that photo. Try again in good light, or type the expense in.', true);
   } finally {
-    $('scanFile').disabled = false;
+    $('scanCamera').disabled = $('scanFile').disabled = false;
     onOcrProgress = () => {};
   }
-});
+}
+$('scanCamera').addEventListener('change', scanPicked);
+$('scanFile').addEventListener('change', scanPicked);
 
 // ---------- To sort ----------
 

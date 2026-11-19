@@ -160,7 +160,9 @@ summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
 /* Receipt scanning and the To sort screen */
 .scan-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .scan-btn { flex: 1; min-width: 0; border-color: var(--accent); color: var(--accent); font-weight: 600; }
-.scan-btn:has(input:disabled) { opacity: .6; cursor: progress; }
+.scan-pick { flex: 0 0 auto; }
+.scan-btn:has(input:disabled), .scan-pick:has(input:disabled) { opacity: .6; cursor: progress; }
+.sort-banner { flex-basis: 100%; }
 .sort-banner { margin-top: 4px; border-color: var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 600; }
 .scan-status { margin: 8px 0 0; font-size: .9rem; color: var(--accent); }
 .scan-status.error { color: var(--danger); }
