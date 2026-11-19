@@ -53,7 +53,9 @@ Tap **Scan receipt** on the Add tab to open the camera, or **From photos** to us
 The withdrawn cash is **not** counted as spending, because you log what you buy with it. The ATM fee **is** counted. This avoids counting the same money twice.
 
 ### Exchange rates
-When online, the app downloads daily rates from open.er-api.com (free, no key) and saves them on the device. Offline, it uses the last saved rates. Each expense keeps the rate it was logged with, so old totals don't shift. You can type your own rate under "Exchange rate", for example to match a card statement.
+When online, the app downloads daily rates from open.er-api.com (free, no key) and saves them on the device. Offline, it uses the last saved rates.
+
+For an expense dated in the past, the app fetches that day's rate instead, from the free [fawazahmed0 currency API](https://github.com/fawazahmed0/exchange-api) (340 currencies, daily back to 2 March 2024). The note under the amount says which day's rate is used, e.g. "rate for Nov 12". Each day is downloaded once and kept on the device. Offline, or for a date before March 2024, today's rate is used and the note says so. A rate you type yourself is never replaced. When you edit a saved expense, changing its date keeps its rate; tap **Use market rate for this date** under Exchange rate to switch. Each expense keeps the rate it was logged with, so old totals don't shift. You can type your own rate under "Exchange rate", for example to match a card statement.
 
 ### Checking your bank's conversion
 Each foreign expense saves the original amount and currency, the app's market-rate conversion, and (optionally) the **amount on your statement**. Once the trip is over, go to **Summary → Reconcile with statement** and type in what each charge cost on your statement. Each amount saves as you type, so you can do it in more than one sitting. The difference is shown as **bank markup**, per charge and in the Summary, and is counted in your total spend.

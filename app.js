@@ -164,6 +164,12 @@ $('tripSelect').addEventListener('change', e => {
 
 // ---------- Add / edit expense ----------
 
+let rateTouched = false; // the person typed their own rate, so leave it alone
+let rateNote = '';       // e.g. "rate for Nov 12", shown after the converted amount
+let rateJob = 0;         // ignores answers to older rate requests
+let pendingRate = null;  // a past-date rate still on its way; Save waits for it
+
+// Fills the rate field: today's rate at once, then, for a past date, that day's rate.
 function setRateField() {
   const cur = $('currency').value;
   const r = Rates.get(cur, state.home);
@@ -171,6 +177,33 @@ function setRateField() {
   $('rateCur').textContent = cur;
   document.querySelectorAll('.homeCode').forEach(el => el.textContent = state.home);
   $('rateDetails').hidden = cur === state.home;
+  rateNote = '';
+  rateJob++; // any request still running is now out of date
+  pendingRate = null;
+  updateConverted();
+  const date = $('date').value;
+  if (cur !== state.home && date && date < todayStr()) loadRateForDate(cur, date);
+}
+
+async function loadRateForDate(cur, date) {
+  const job = ++rateJob;
+  const day = fmtDate(date, { month: 'short', day: 'numeric' });
+  rateNote = `getting the rate for ${day}…`;
+  updateConverted();
+  const request = Rates.forDate(date, cur, state.home).catch(() => null);
+  pendingRate = request;
+  const r = await request;
+  if (job !== rateJob) return; // the currency or date changed meanwhile
+  pendingRate = null;
+  if (rateTouched) { rateNote = ''; updateConverted(); return; }
+  if (r) {
+    $('rate').value = +r.toPrecision(6);
+    rateNote = `rate for ${day}`;
+  } else {
+    rateNote = date < Rates.HISTORY_START
+      ? "no rates before March 2024, so today's rate is used"
+      : `couldn't get the rate for ${day}, so today's rate is used`;
+  }
   updateConverted();
 }
 
@@ -179,10 +212,12 @@ function updateConverted() {
   const cur = $('currency').value;
   const rate = parseFloat($('rate').value);
   const fee = parseFloat($('atmFee').value) || 0;
-  if (!amt || cur === state.home) { $('converted').textContent = ''; return; }
+  if (cur === state.home) { $('converted').textContent = ''; return; }
+  if (!amt) { $('converted').textContent = rateNote ? rateNote[0].toUpperCase() + rateNote.slice(1) : ''; return; }
   if (!rate) { $('converted').textContent = 'No rate yet — enter one under Exchange rate'; return; }
   let txt = '≈ ' + money(amt / rate);
   if ($('category').value === CASH && fee) txt += ` + ${money(fee / rate)} fee`;
+  if (rateNote) txt += ` · ${rateNote}`;
   $('converted').textContent = txt;
 }
 
@@ -199,6 +234,7 @@ function toggleFee() { $('feeWrap').hidden = $('category').value !== CASH; updat
 function resetExpenseForm() {
   const trip = activeTrip();
   $('expenseForm').reset();
+  rateTouched = false;
   scanned = false;
   scanStatus('');
   $('scanDetails').hidden = true;
@@ -227,19 +263,38 @@ function renderAddView() {
 
 $('amount').addEventListener('input', updateConverted);
 $('atmFee').addEventListener('input', updateConverted);
-$('rate').addEventListener('input', updateConverted);
-$('currency').addEventListener('change', setRateField);
+$('rate').addEventListener('input', () => {
+  rateTouched = true;
+  rateJob++; // a typed rate beats any rate still being fetched
+  pendingRate = null;
+  rateNote = '';
+  updateConverted();
+});
+// A new currency makes any typed rate meaningless, so start fresh.
+$('currency').addEventListener('change', () => { rateTouched = false; setRateField(); });
+// A new expense follows its date's rate. An edit keeps its saved rate (it may be one you typed);
+// "Use market rate for this date" applies the date's rate on purpose.
+$('date').addEventListener('change', () => {
+  if (!$('editId').value && !rateTouched) setRateField();
+});
+$('rateForDate').addEventListener('click', () => { rateTouched = false; setRateField(); });
 $('category').addEventListener('change', toggleFee);
 // A new expense takes the chosen trip's currency; an edit keeps its own.
 $('expTrip').addEventListener('change', () => {
   if ($('editId').value) return;
   const t = tripById($('expTrip').value);
-  if (t) { $('currency').value = t.currency; setRateField(); }
+  if (t) { $('currency').value = t.currency; rateTouched = false; setRateField(); }
 });
 $('cancelEdit').addEventListener('click', () => { resetExpenseForm(); showView('trips'); });
 
-$('expenseForm').addEventListener('submit', e => {
+$('expenseForm').addEventListener('submit', async e => {
   e.preventDefault();
+  if (pendingRate) { // wait for the date's rate rather than save today's by mistake
+    $('saveBtn').disabled = true;
+    await pendingRate;
+    await null; // let the rate land in the field first
+    $('saveBtn').disabled = false;
+  }
   const trip = tripById($('expTrip').value) || activeTrip();
   if (!trip) return;
   const amount = parseFloat($('amount').value);
@@ -301,6 +356,10 @@ function editExpense(id) {
   $('date').value = x.date;
   $('note').value = x.note;
   toggleFee();
+  rateJob++;
+  pendingRate = null;
+  rateNote = '';
+  rateTouched = false;
   $('rate').value = x.rate;
   $('rateCur').textContent = x.currency;
   $('rateDetails').hidden = x.currency === state.home;
@@ -1227,7 +1286,7 @@ async function updateRates(force) {
   try {
     await Rates.refresh(state.home);
     if (force) toast('Rates updated');
-    if (!$('editId').value) setRateField();
+    if (!$('editId').value && !rateTouched) setRateField(); // don't replace a rate you typed
     renderTopbar();
     if ($('view-settings').classList.contains('active')) renderSettings();
   } catch {

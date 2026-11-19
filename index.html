@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
   <header class="topbar">
@@ -81,7 +81,8 @@
         <details id="rateDetails">
           <summary>Exchange rate</summary>
           <label>1 <span class="homeCode"></span> = <input id="rate" type="number" step="any" min="0" inputmode="decimal"> <span id="rateCur"></span></label>
-          <p class="hint">Filled in automatically. Change it to match your card statement.</p>
+          <p class="hint">Filled in automatically with the market rate for the expense's date. Change it to match your card statement.</p>
+          <button type="button" id="rateForDate" class="link-btn">Use market rate for this date</button>
         </details>
         <div class="row actions">
           <button type="submit" class="primary grow" id="saveBtn">Save expense</button>
@@ -212,7 +213,7 @@
 
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <script src="rates.js?v=3"></script>
-  <script src="app.js?v=8"></script>
+  <script src="rates.js?v=4"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>
