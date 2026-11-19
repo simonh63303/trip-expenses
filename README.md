@@ -60,6 +60,29 @@ For an expense dated in the past, the app fetches that day's rate instead, from 
 ### Checking your bank's conversion
 Each foreign expense saves the original amount and currency, the app's market-rate conversion, and (optionally) the **amount on your statement**. Once the trip is over, go to **Summary → Reconcile with statement** and type in what each charge cost on your statement. Each amount saves as you type, so you can do it in more than one sitting. The difference is shown as **bank markup**, per charge and in the Summary, and is counted in your total spend.
 
+### Running the tests
+The tests open the app in a headless Chromium at phone size and check what a person would see: reading receipts, the backup reminder, renaming categories, report filters, exchange rates for past dates, and offline scanning.
+
+```bash
+npm install                      # first time: installs Playwright
+npx playwright install chromium  # first time: downloads the browser
+npm test                         # all tests, about 10 seconds
+npm test -- rates                # only test files whose name contains "rates"
+```
+
+The browser's clock is frozen at 19 Nov 2026 so date checks give the same answer on any day, and the exchange-rate services are answered from `tests/fixtures/` (a real 12 Nov 2026 rate file), so no internet is needed. The run ends with a count and exits with an error if any check fails.
+
+| File | Checks |
+|---|---|
+| `tests/run.js` | Starts a local server, runs every `*.test.js`, prints a summary |
+| `tests/helpers.js` | Shared setup: frozen clock, sample data, a drawn receipt photo |
+| `parser.test.js` | Finding the total, date and shop name in receipt text |
+| `scan.test.js` | Upgrading old data, a real OCR scan, To sort, scanning offline |
+| `camera.test.js` | Scan receipt opens the camera; From photos opens the picker |
+| `backup.test.js` | When the reminder shows, Later, the Share sheet |
+| `categories.test.js` | Rename, merge, built-in names, Report category filter, CSVs |
+| `rates.test.js` | Past-date rates, the backup address, typed rates, offline fallback |
+
 ### Updating the code
 When you change `styles.css`, `app.js` or `rates.js`, bump the `?v=` number on its link in `index.html` so phones download the new version instead of an old cached copy.
 
@@ -74,4 +97,5 @@ When you change `styles.css`, `app.js` or `rates.js`, bump the `?v=` number on i
 | `sw.js` | Service worker: saves the app files so it opens offline |
 | `manifest.json`, `icon.svg` | Let the phone install it like an app |
 | `ocr/` | Receipt reader (Tesseract), loaded on the first scan; see `ocr/README.md` |
+| `tests/`, `package.json` | Automated tests; see Running the tests |
 

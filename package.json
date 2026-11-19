@@ -1,0 +1,11 @@
+{
+  "name": "trip-expenses",
+  "private": true,
+  "description": "Phone-first, offline trip and everyday expense tracker",
+  "scripts": {
+    "test": "node tests/run.js"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
