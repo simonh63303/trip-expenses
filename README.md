@@ -45,7 +45,10 @@ In the home-screen app, **Export backup** (and the CSV exports) open the Share s
 Tap **Scan receipt** on the Add tab to open the camera, or **From photos** to use a picture you already took. The phone reads it with Tesseract (no server, nothing leaves the device) and fills in the total, date and shop name. Check them, fix anything it misread, and tap **Save**. **What the scanner read** shows the raw text if you want to see where a number came from.
 
 - Scans go to the **Everyday** trip, in the **Uncategorized** category. A **"3 to sort"** button then appears on the Add tab; it opens **To sort**, where one tap files each receipt under a category, a picker moves it to a trip, and **Delete** removes a bad scan.
+- Before reading, the photo is cropped to the receipt (the bright paper), since a counter or table's texture reads as junk letters.
 - The total comes from a line like "Total" or "Amount due", never "Subtotal", "Tax" or "Change". With no such line, the largest amount is used.
+- If there's no date, or the total was only the largest amount, the app reads the photo a second time with a method that copes better with faint print and ads showing through, and fills in what the first read missed. This adds a few seconds.
+- The shop name is the store's web address near the top if there is one (www.usps.com gives USPS), otherwise the top line the reader was surest of. Logos, staff names, addresses and words like "Wholesale" are skipped. When nothing fits, the name is left blank rather than filled with a guess.
 - Dates like 03/04/2026 are read month-first (US), unless that gives an impossible or future date.
 - The first scan downloads the reader (about 7 MB). After that, scanning works offline. The photo itself is not kept.
 
@@ -77,6 +80,7 @@ The browser's clock is frozen at 19 Nov 2026 so date checks give the same answer
 | `tests/run.js` | Starts a local server, runs every `*.test.js`, prints a summary |
 | `tests/helpers.js` | Shared setup: frozen clock, sample data, a drawn receipt photo |
 | `parser.test.js` | Finding the total, date and shop name in receipt text |
+| `receipts.test.js` | Real receipts (Costco, USPS, Dierbergs) from saved reader output, private details removed |
 | `scan.test.js` | Upgrading old data, a real OCR scan, To sort, scanning offline |
 | `camera.test.js` | Scan receipt opens the camera; From photos opens the picker |
 | `backup.test.js` | When the reminder shows, Later, the Share sheet |

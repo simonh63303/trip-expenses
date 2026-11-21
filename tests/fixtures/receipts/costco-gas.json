@@ -1,0 +1,99 @@
+{
+ "receipt": "costco-gas",
+ "today": "2026-11-21",
+ "expected": {
+  "merchant": "Costco",
+  "amount": 24.46,
+  "date": "2026-11-21"
+ },
+ "first": {
+  "text": "==WHOLESALE\nCostco\n\n2100 Lake Boulevard\nSpringfield, MO 65801\nMember 000000000000 0\nInvoicelt 00000 :\nDate: 11/21/26 :\nTime: 10:85 4\nAuthit 000000 0\nUl Acct # 0\n*xxeNXAXXAXXAX23J9 N\nPump Gallons Price k\n23 8.157 $\u00a7 2.999 +\nProduct Amount 5\nRegular $ 24.46\nTotal Sale \u00a7 24.46\nSALE- Contactless\n\nApproved\n\nTranlD# 000000000000\n\nCHASE UISA\nPayment Network 02\nA0000000000000\n\nNo CUM\n",
+  "lines": [
+   {
+    "text": "==WHOLESALE",
+    "conf": 72
+   },
+   {
+    "text": "Costco",
+    "conf": 95
+   },
+   {
+    "text": "2100 Lake Boulevard",
+    "conf": 80
+   },
+   {
+    "text": "Springfield, MO 65801",
+    "conf": 92
+   },
+   {
+    "text": "000000000000 0",
+    "conf": 46
+   },
+   {
+    "text": "00000",
+    "conf": 36
+   },
+   {
+    "text": "Date: 11/21/26",
+    "conf": 55
+   },
+   {
+    "text": "Time: 10:85",
+    "conf": 60
+   },
+   {
+    "text": "Authit 000000",
+    "conf": 60
+   },
+   {
+    "text": "Ul Acct #",
+    "conf": 77
+   },
+   {
+    "text": "Pump Gallons Price",
+    "conf": 71
+   },
+   {
+    "text": "23 8.157 2.999",
+    "conf": 67
+   },
+   {
+    "text": "Product Amount",
+    "conf": 75
+   },
+   {
+    "text": "Regular $ 24.46",
+    "conf": 89
+   },
+   {
+    "text": "Total Sale 24.46",
+    "conf": 78
+   },
+   {
+    "text": "SALE- Contactless",
+    "conf": 89
+   },
+   {
+    "text": "Approved",
+    "conf": 94
+   },
+   {
+    "text": "TranlD# 000000000000",
+    "conf": 76
+   },
+   {
+    "text": "CHASE UISA",
+    "conf": 91
+   },
+   {
+    "text": "Payment Network 02",
+    "conf": 94
+   },
+   {
+    "text": "No CUM",
+    "conf": 96
+   }
+  ]
+ },
+ "second": null
+}

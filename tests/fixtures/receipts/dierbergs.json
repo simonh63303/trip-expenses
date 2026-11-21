@@ -1,0 +1,243 @@
+{
+ "receipt": "dierbergs",
+ "today": "2026-11-21",
+ "expected": {
+  "merchant": "",
+  "amount": 10.29,
+  "date": "2026-11-21"
+ },
+ "first": {
+  "text": "EEE Ce ES\n\u00e9\n\u00a7\ni\n8680 01ive Blvd. ;\nSpringfield, MO 65801 ;\n555-010-0100 i\nStore Director: Wendell Jackson \u00a7\nRL NGUINE\nARTLLA LI \u00a2\nLE ors oR wR Poe)\n28 $1.49 $2.98tF\u00b0 8\nPRODUGE 3\n~ FUJT APPLE :\n1.0910 @ ~~ $1.99/1b gouigut-Frn \u00a7\nORANGE i\n20 $0.74 $148 tF 8\nPROMO SAVINGS! :\nCash Reward -$2.00 * 2\nSUBTOTAL 9.6 :\nfe a |\natlas | ; : 16722:52 ;\nHage VISA Entry Method:Cntotless.\nFRCHISE peng Kass B\nAUTH CODE :000000\nMode: : .\nAID 0) Issuer x\ni avant | |\nRete CE ccoarzosooog |\nhE Bes A0T MAD Ja\nEDGER Ew BEET neh i\nMID: wi : SRE it\n[ARR TH: hae\n\u00a9 Eig B18] 100 Boao sng 10.29\nEE 8\nSEANRAEI DY =i) 18H) i om\n",
+  "lines": [
+   {
+    "text": "i",
+    "conf": 69
+   },
+   {
+    "text": "8680 01ive Blvd.",
+    "conf": 59
+   },
+   {
+    "text": "Springfield, MO 65801",
+    "conf": 80
+   },
+   {
+    "text": "555-010-0100",
+    "conf": 39
+   },
+   {
+    "text": "Store Director: Wendell Jackson",
+    "conf": 85
+   },
+   {
+    "text": "NGUINE",
+    "conf": 51
+   },
+   {
+    "text": "ARTLLA LI",
+    "conf": 48
+   },
+   {
+    "text": "28 $1.49",
+    "conf": 23
+   },
+   {
+    "text": "PRODUGE 3",
+    "conf": 75
+   },
+   {
+    "text": "APPLE",
+    "conf": 34
+   },
+   {
+    "text": "$1.99/1b",
+    "conf": 0
+   },
+   {
+    "text": "ORANGE",
+    "conf": 55
+   },
+   {
+    "text": "20 $0.74 8",
+    "conf": 33
+   },
+   {
+    "text": "Cash Reward -$2.00 2",
+    "conf": 67
+   },
+   {
+    "text": "SUBTOTAL 9.6 :",
+    "conf": 91
+   },
+   {
+    "text": "VISA Entry",
+    "conf": 47
+   },
+   {
+    "text": "AUTH CODE :000000",
+    "conf": 66
+   },
+   {
+    "text": "Mode: :",
+    "conf": 21
+   },
+   {
+    "text": "Issuer",
+    "conf": 36
+   },
+   {
+    "text": "| |",
+    "conf": 48
+   },
+   {
+    "text": "|",
+    "conf": 16
+   },
+   {
+    "text": "i",
+    "conf": 16
+   },
+   {
+    "text": "B18] 100 10.29",
+    "conf": 25
+   }
+  ]
+ },
+ "second": {
+  "text": "NSERC CS TAY he BB hy mAs RN I AI\nAd We ns SED he\ni\n4 - To i\n: rT TT z\n3 Zi NE bel aN E\n: 100 Main Blvd, :\nE Springfield, MO 65801 ;\n; 555-010-0100 i\nStore Director: Wendell Jackson \u00a7\n: Ei INGUINE :\n: RILLA L\nZeist ho ar ep |\n: 26 $1.49 $2.98 t F\nd ProoUcE \u00a7\n1 TUJT APPLE ;\n8 1.091h@  $1.99/1b $2.17\u00b0t F\n8 ORANGE :\n: 26 $0.74 $1.48 t F\nd PROMO SAVINGS! <\n; Cash Reward -$2.00 * :\nSUBTOTAL $9.63 :\n\n: t-Low Tax $0.66 :\nORDER TOTAL $10.29 ;\n11/21/2026 10:52:52 ie\nEHASEAHSH Entry Method:Cntct less 2\n| CARD Ae : opr AXKRH0000 i\n| AUTH CODE: 000000 gt\n\u00a7 Mode: B\n: Iss\n\nHe ooooononsih  B\n\nd TAD g 0000000000 iS\nARC X\nTC: 00 Is\n\n: F000F 0DE00F00000 0\n\noh 000000\" \u00b0 TID: 000 SEQ; (00000 :\nata Usos 10.29 8\n\n: 3\n\nCHANGE HR E\n",
+  "lines": [
+   {
+    "text": "-",
+    "conf": 51
+   },
+   {
+    "text": "3",
+    "conf": 29
+   },
+   {
+    "text": "Main Blvd, :",
+    "conf": 39
+   },
+   {
+    "text": "Springfield, MO 65801",
+    "conf": 60
+   },
+   {
+    "text": "555-010-0100",
+    "conf": 35
+   },
+   {
+    "text": "Store Director: Wendell Jackson",
+    "conf": 67
+   },
+   {
+    "text": ": INGUINE",
+    "conf": 45
+   },
+   {
+    "text": "RILLA L",
+    "conf": 59
+   },
+   {
+    "text": "ho |",
+    "conf": 46
+   },
+   {
+    "text": ": 26 $1.49 $2.98 t F",
+    "conf": 79
+   },
+   {
+    "text": "APPLE",
+    "conf": 49
+   },
+   {
+    "text": "$1.99/1b F",
+    "conf": 37
+   },
+   {
+    "text": "ORANGE",
+    "conf": 23
+   },
+   {
+    "text": "26 $0.74 $1.48 t F",
+    "conf": 69
+   },
+   {
+    "text": "PROMO SAVINGS!",
+    "conf": 23
+   },
+   {
+    "text": "; Cash Reward -$2.00 *",
+    "conf": 73
+   },
+   {
+    "text": "SUBTOTAL $9.63",
+    "conf": 62
+   },
+   {
+    "text": ": t-Low Tax $0.66 :",
+    "conf": 73
+   },
+   {
+    "text": "ORDER TOTAL $10.29",
+    "conf": 44
+   },
+   {
+    "text": "11/21/2026",
+    "conf": 60
+   },
+   {
+    "text": "Entry",
+    "conf": 8
+   },
+   {
+    "text": "|",
+    "conf": 0
+   },
+   {
+    "text": "AUTH",
+    "conf": 18
+   },
+   {
+    "text": "Mode:",
+    "conf": 1
+   },
+   {
+    "text": ": Iss",
+    "conf": 88
+   },
+   {
+    "text": "d TAD 0000000000",
+    "conf": 42
+   },
+   {
+    "text": "ARC",
+    "conf": 0
+   },
+   {
+    "text": "TC: 00",
+    "conf": 56
+   },
+   {
+    "text": "F000F 0DE00F00000",
+    "conf": 51
+   },
+   {
+    "text": "TID: SEQ; (00000",
+    "conf": 29
+   },
+   {
+    "text": "10.29",
+    "conf": 49
+   },
+   {
+    "text": "3",
+    "conf": 54
+   },
+   {
+    "text": "CHANGE",
+    "conf": 41
+   }
+  ]
+ }
+}

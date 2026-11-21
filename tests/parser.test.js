@@ -16,10 +16,23 @@ const CASES = [
     { amount: 24.00, date: '2026-11-19', merchant: 'Diner' }],
   ['no labels: largest amount', 'Market stall\n3.00\n4.50\n12.25',
     { amount: 12.25, date: null, merchant: 'Market stall' }],
-  ['future date ignored', 'Store\n12/25/2030\nTotal 9.99',
-    { amount: 9.99, date: null, merchant: 'Store' }],
+  ['future date ignored; "Store" alone is not a name', 'Store\n12/25/2030\nTotal 9.99',
+    { amount: 9.99, date: null, merchant: '' }],
   ['garbage', '~~~ ## ..\n',
     { amount: null, date: null, merchant: '' }],
+];
+
+// Shop names from single lines, as the reader gives them.
+const NAMES = [
+  ['stray dot at the start', '. Dierbergs', 'Dierbergs'],
+  ['logo read as 2-letter scraps', 'AE RE Se MR Ra ER', ''],
+  ['curly apostrophe', 'Lulu’s', "Lulu's"],
+  ['a kind of shop is not a name', '==WHOLESALE', ''],
+  ['staff line', 'Store Director: Wendell Jackson', ''],
+  ['a total line is not a name', 'Total 9.99', ''],
+  ['street address', '100 Main Blvd.', ''],
+  ['city, state and ZIP', 'Springfield, MO 65801', ''],
+  ['capitals tidied', "TRADER JOE'S", "Trader Joe's"],
 ];
 
 module.exports = async ({ browser, baseURL, check }) => {
@@ -28,6 +41,16 @@ module.exports = async ({ browser, baseURL, check }) => {
     const got = await page.evaluate(([t, today]) => parseReceipt(t, today), [text, TODAY]);
     check(name, Object.keys(want).every(k => got[k] === want[k]), got);
   }
+  for (const [name, line, want] of NAMES) {
+    const got = await page.evaluate(l => findMerchant([l]), line);
+    check(`name: ${name}`, got === want, got);
+  }
+  const lines = [{ text: 'MAIN STATION', conf: 95 }, { text: 'POSTAL SERVICE.', conf: 72 }];
+  check('a web address near the top names the shop', await page.evaluate(l => findMerchant(l, 'MAIN STATION\nWww. Usps . com\n'), lines) === 'USPS');
+  check('…unless a top line spells it, which keeps its capitals', await page.evaluate(() => findMerchant([{ text: 'Costco', conf: 95 }], 'Costco\nwww.costco.com')) === 'Costco');
+  check('payment sites are not shop names', await page.evaluate(() => findMerchant(['Blue Door Cafe'], 'Blue Door Cafe\nwww.squareup.com')) === 'Blue Door Cafe');
+  check('the surest line wins, not the first', await page.evaluate(() => findMerchant([{ text: 'WHOLESALE CLUB', conf: 72 }, { text: 'Costco', conf: 95 }])) === 'Costco');
+  check('words the reader was unsure of are ignored', await page.evaluate(() => findMerchant([{ text: 'DF Wl BF car ra', conf: 38 }])) === '');
   check('no page errors', !page.errors.length, page.errors);
   await context.close();
 };

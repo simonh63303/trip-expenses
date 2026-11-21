@@ -434,7 +434,50 @@ function getOcr() {
   return ocrReady;
 }
 
-// Shrinks the photo and boosts contrast in greyscale, which helps OCR on phone photos.
+// Finds the receipt in a photo: the widest bright strip, since paper is brighter than a
+// counter or table. Returns {x, y, w, h}, or null when there's nothing clear to cut away.
+function paperBox(lum, w, h) {
+  // Otsu's method: the brightness level that best splits the pixels into two groups.
+  const hist = new Float64Array(256);
+  for (let i = 0; i < lum.length; i++) hist[lum[i]]++;
+  let sum = 0;
+  for (let t = 0; t < 256; t++) sum += t * hist[t];
+  let wB = 0, sumB = 0, best = 0, cut = 128;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (!wB || wB === lum.length) continue;
+    sumB += t * hist[t];
+    const mB = sumB / wB, mF = (sum - sumB) / (lum.length - wB);
+    const between = wB * (lum.length - wB) * (mB - mF) ** 2;
+    if (between > best) { best = between; cut = t; }
+  }
+  // Share of bright pixels per column (or row), averaged over neighbours so a bold logo
+  // or a line of text doesn't split the paper in two.
+  const smooth = (a, r) => a.map((_, i) => { let s = 0, n = 0; for (let j = Math.max(0, i - r); j <= Math.min(a.length - 1, i + r); j++) { s += a[j]; n++; } return s / n; });
+  const longestRun = (a, min) => {
+    let bestLen = 0, bestStart = 0, start = -1;
+    a.forEach((v, i) => {
+      if (v >= min) { if (start < 0) start = i; if (i - start + 1 > bestLen) { bestLen = i - start + 1; bestStart = start; } }
+      else start = -1;
+    });
+    return [bestStart, bestStart + bestLen - 1];
+  };
+  const cols = new Array(w).fill(0);
+  for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x++) if (lum[y * w + x] > cut) cols[x]++;
+  const [x0, x1] = longestRun(smooth(cols.map(c => c / Math.ceil(h / 2)), Math.round(w / 100)), 0.5);
+  const rows = new Array(h).fill(0);
+  for (let y = 0; y < h; y++) for (let x = x0; x <= x1; x += 2) if (lum[y * w + x] > cut) rows[y]++;
+  const [y0, y1] = longestRun(smooth(rows.map(c => c / Math.ceil((x1 - x0 + 1) / 2)), Math.round(h / 40)), 0.4);
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+  if (bw < w * 0.2 || bh < h * 0.2) return null;   // too small to be the receipt
+  if (bw > w * 0.95 && bh > h * 0.95) return null; // the paper fills the photo already
+  const m = Math.round(Math.max(w, h) * 0.01);     // keep a thin margin
+  const x = Math.max(0, x0 - m), y = Math.max(0, y0 - m);
+  return { x, y, w: Math.min(w, x1 + m + 1) - x, h: Math.min(h, y1 + m + 1) - y };
+}
+
+// Shrinks the photo, crops it to the receipt, and boosts contrast in greyscale, which
+// helps OCR on phone photos.
 async function prepImage(file) {
   const url = URL.createObjectURL(file);
   try {
@@ -445,19 +488,28 @@ async function prepImage(file) {
       i.src = url;
     });
     const scale = Math.min(1, 2000 / Math.max(img.naturalWidth, img.naturalHeight));
+    const W = Math.round(img.naturalWidth * scale), H = Math.round(img.naturalHeight * scale);
+    const src = document.createElement('canvas');
+    src.width = W; src.height = H;
+    const sctx = src.getContext('2d', { willReadFrequently: true });
+    sctx.drawImage(img, 0, 0, W, H);
+    const all = sctx.getImageData(0, 0, W, H).data;
+    const lum = new Uint8Array(W * H);
+    for (let i = 0; i < lum.length; i++) lum[i] = (all[i * 4] * 299 + all[i * 4 + 1] * 587 + all[i * 4 + 2] * 114) / 1000 | 0;
+
+    // Cut away the counter or table around the receipt; its texture reads as junk letters.
+    const box = paperBox(lum, W, H) || { x: 0, y: 0, w: W, h: H };
     const c = document.createElement('canvas');
-    c.width = Math.round(img.naturalWidth * scale);
-    c.height = Math.round(img.naturalHeight * scale);
+    c.width = box.w; c.height = box.h;
     const ctx = c.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0, c.width, c.height);
-    const d = ctx.getImageData(0, 0, c.width, c.height);
+    const d = ctx.createImageData(box.w, box.h);
     const px = d.data, hist = new Uint32Array(256);
-    for (let i = 0; i < px.length; i += 4) {
-      const y = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000 | 0;
-      px[i] = y; hist[y]++;
+    for (let y = 0; y < box.h; y++) for (let x = 0; x < box.w; x++) {
+      const v = lum[(y + box.y) * W + x + box.x];
+      px[(y * box.w + x) * 4] = v; hist[v]++;
     }
     // Stretch so the darkest 2% become black and the lightest 2% white.
-    const total = px.length / 4;
+    const total = box.w * box.h;
     let lo = 0, hi = 255, acc = 0;
     while (lo < 255 && (acc += hist[lo]) < total * 0.02) lo++;
     acc = 0;
@@ -466,8 +518,10 @@ async function prepImage(file) {
     for (let i = 0; i < px.length; i += 4) {
       const v = Math.max(0, Math.min(255, (px[i] - lo) * 255 / range));
       px[i] = px[i + 1] = px[i + 2] = v;
+      px[i + 3] = 255;
     }
     ctx.putImageData(d, 0, 0);
+    c.cropped = box.w !== W || box.h !== H; // for tests
     return c;
   } finally {
     URL.revokeObjectURL(url);
@@ -484,7 +538,9 @@ function moneyIn(line) {
   return out.filter(n => n > 0);
 }
 
-function findTotal(lines) {
+// The total, and whether a label such as "Total" pointed to it (rather than just taking
+// the largest amount, a guess that can be wrong).
+function findTotalInfo(lines) {
   const skip = /sub\s*-?\s*t[o0]tal|tax|tip|change|sav(ed|ings?)|discount|\bitems?\b|qty|\bcash\b|tender|points|rounding/i;
   const tiers = [
     /grand\s*t[o0]tal|amount\s*due|balance\s*due|t[o0]tal\s*due|to\s*pay|t[o0]tal\s*amount/i,
@@ -498,11 +554,13 @@ function findTotal(lines) {
       const here = moneyIn(line);
       found.push(...(here.length ? here : moneyIn(lines[i + 1] || ''))); // label and amount can sit on separate lines
     });
-    if (found.length) return Math.max(...found);
+    if (found.length) return { amount: Math.max(...found), labelled: true };
   }
   const all = lines.filter(l => !skip.test(l)).flatMap(moneyIn);
-  return all.length ? Math.max(...all) : null;
+  return { amount: all.length ? Math.max(...all) : null, labelled: false };
 }
+
+const findTotal = lines => findTotalInfo(lines).amount;
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
@@ -530,21 +588,91 @@ function findDate(text, today = todayStr()) {
   return null;
 }
 
-function findMerchant(lines) {
+// Words that describe a kind of shop, not which one: on their own they aren't a name.
+const NOT_A_NAME = /^(wholesale|supermarket|super market|grocery|groceries|market|store|shop|restaurant|cafe|bar|pharmacy|gas|fuel|station|customer copy|merchant copy|copy|sale|sales|receipt|welcome)$/i;
+
+// Cleans a candidate line into a shop name, or returns '' if it doesn't look like one.
+function asName(line) {
   const noise = /receipt|welcome|thank|\btel\b|phone|www\.|http|\.com|date|time|invoice|order|cashier|server|table|guest|^\W*\d/i;
-  for (const line of lines.slice(0, 6)) {
-    const letters = (line.match(/[a-z]/gi) || []).length;
-    if (letters < 3 || letters / line.length < 0.5 || noise.test(line)) continue;
-    let name = line.replace(/[^\p{L}\p{N}&'. -]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
-    if (!/[a-z]/.test(name)) name = name.toLowerCase().replace(/(^|[\s-])\p{L}/gu, c => c.toUpperCase()); // TRADER JOE'S -> Trader Joe's
-    if (name.length >= 3) return name;
-  }
-  return '';
+  const staff = /director|manager|cashier|clerk|associate|operator|served by|your host/i;
+  const money = /t[o0]ta[l1]|\btax\b|amount|balance|change|\$|\d[.,]\d{2}\b/i; // prices and totals aren't names
+  if (money.test(line)) return '';
+  // Address lines: a street word with a number ("8680 Olive Blvd."), or a state and ZIP ("MO 63132").
+  const address = /\b[a-z]{2}\.?\s+\d{5}\b|\d.*\b(st|ave|blvd|rd|dr|hwy|ln|ct|pkwy|suite|ste|street|avenue|boulevard|road|drive|highway|lane)\b/i;
+  if (staff.test(line) || address.test(line)) return '';
+  const letters = (line.match(/\p{L}/gu) || []).length;
+  if (letters < 3 || letters / line.length < 0.5 || noise.test(line)) return '';
+  let name = line.replace(/[’‘`]/g, "'")                     // curly apostrophes: Lulu’s -> Lulu's
+    .replace(/[^\p{L}\p{N}&'. -]/gu, ' ').replace(/\s+/g, ' ')
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}.']+$/gu, '')       // stray marks at the ends: ". Dierbergs"
+    .trim().slice(0, 40);
+  const words = name.split(' ').filter(w => /\p{L}/u.test(w));
+  // Logos misread as scraps: "AE RE Se MR Ra ER". A name needs a real-looking word.
+  if (!words.some(w => w.replace(/[^\p{L}]/gu, '').length >= 3 && /[aeiouy]/i.test(w))) return '';
+  if (words.reduce((n, w) => n + w.length, 0) / words.length < 2.5) return '';
+  if (NOT_A_NAME.test(name)) return '';
+  if (!/\p{Ll}/u.test(name)) name = name.toLowerCase().replace(/(^|[\s-])\p{L}/gu, c => c.toUpperCase()); // TRADER JOE'S -> Trader Joe's
+  return name.length >= 3 ? name : '';
 }
 
-function parseReceipt(text, today) {
+// A shop's web address near the top of the receipt, e.g. "www.usps.com" -> "usps".
+// OCR often adds spaces ("Www. Usps . com"). Payment and survey sites don't count.
+function findDomain(text) {
+  const top = text.split('\n').slice(0, 12).join(' ');
+  const m = top.match(/w\s*w\s*w\s*\.\s*([a-z0-9-]{2,30})\s*\.\s*(?:com|net|org|co|us|shop|store)\b/i)
+    || top.match(/\b([a-z0-9-]{3,30})\s*\.\s*(?:com|net|org)\b/i);
+  const name = m && m[1].toLowerCase();
+  return name && !/^(gmail|yahoo|google|facebook|instagram|twitter|square|squareup|clover|toasttab|toast|paypal|stripe|shopify|yelp|survey|email|emailus|mail)$/.test(name) ? name : '';
+}
+
+// The shop name: the web address near the top if there is one (unless a top line spells
+// the same name, which has nicer capitals), else the top line the reader was surest of.
+// `lines` can be plain strings, or {text, conf} from the reader; without confidence, the
+// first acceptable line wins. Returns '' rather than guess.
+function findMerchant(lines, text = '') {
+  const domain = findDomain(text);
+  let best = null;
+  for (const [i, l] of lines.slice(0, 8).entries()) {
+    const text = typeof l === 'string' ? l : l.text;
+    const conf = typeof l === 'string' ? 100 - i : l.conf; // plain text: earlier is better
+    if (conf < 60) continue;
+    const name = asName(text);
+    if (!name) continue;
+    if (domain && name.toLowerCase().replace(/[^a-z0-9]/g, '').includes(domain.replace(/-/g, ''))) return name;
+    if (!best || conf > best.conf) best = { name, conf };
+  }
+  if (domain) return domain.length <= 4 ? domain.toUpperCase() : domain[0].toUpperCase() + domain.slice(1); // usps -> USPS
+  return best ? best.name : '';
+}
+
+// `scanned` is the reader's line list with confidence, when there is one.
+function parseReceipt(text, today, scanned) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  return { amount: findTotal(lines), date: findDate(text, today), merchant: findMerchant(lines) };
+  const total = findTotalInfo(lines);
+  return { amount: total.amount, labelled: total.labelled, date: findDate(text, today), merchant: findMerchant(scanned || lines, text) };
+}
+
+// The reader's lines, each with its confidence, keeping only words it was fairly sure of.
+function scannedLines(data) {
+  return (data.blocks || []).flatMap(b => b.paragraphs.flatMap(p => p.lines)).map(l => ({
+    text: l.words.filter(w => w.confidence >= 50).map(w => w.text).join(' ').trim(),
+    conf: l.confidence,
+  })).filter(l => l.text);
+}
+
+// No date, or a total only guessed (no "Total" label found): worth a second read with
+// Sauvola thresholding, which judges light and dark area by area and copes better with
+// faint print and ads showing through from the back.
+const needsSecondRead = r => !r.date || !r.labelled;
+
+// Fills in what the first read missed from the second. A labelled total beats a guess.
+function mergeReads(first, second) {
+  return {
+    amount: second.labelled && !first.labelled ? second.amount : (first.amount ?? second.amount),
+    labelled: first.labelled || second.labelled,
+    date: first.date || second.date,
+    merchant: first.merchant || second.merchant,
+  };
 }
 
 // ----- Scan flow -----
@@ -605,8 +733,23 @@ async function scanPicked(e) {
     catch { scanStatus('Could not load the receipt reader. Connect to the internet once so it can download, then try again.', true); return; }
     const canvas = await prepImage(file);
     scanStatus('Reading receipt…');
-    const { data } = await worker.recognize(canvas);
-    fillFromScan(parseReceipt(data.text), data.text);
+    const read = async () => {
+      const { data } = await worker.recognize(canvas, {}, { text: true, blocks: true });
+      return { r: parseReceipt(data.text, undefined, scannedLines(data)), text: data.text };
+    };
+    let { r, text } = await read();
+    if (needsSecondRead(r)) {
+      scanStatus('Reading again more carefully…');
+      await worker.setParameters({ thresholding_method: '2' });
+      try {
+        const second = await read();
+        r = mergeReads(r, second.r);
+        text += '\n\n--- second read ---\n' + second.text;
+      } finally {
+        await worker.setParameters({ thresholding_method: '0' });
+      }
+    }
+    fillFromScan(r, text);
   } catch {
     scanStatus('Could not read that photo. Try again in good light, or type the expense in.', true);
   } finally {
