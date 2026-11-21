@@ -234,6 +234,8 @@ function toggleFee() { $('feeWrap').hidden = $('category').value !== CASH; updat
 function resetExpenseForm() {
   const trip = activeTrip();
   $('expenseForm').reset();
+  $('deleteRow').hidden = true;
+  $('scanBar').hidden = false;
   rateTouched = false;
   scanned = false;
   scanStatus('');
@@ -285,7 +287,24 @@ $('expTrip').addEventListener('change', () => {
   const t = tripById($('expTrip').value);
   if (t) { $('currency').value = t.currency; rateTouched = false; setRateField(); }
 });
-$('cancelEdit').addEventListener('click', () => { resetExpenseForm(); showView('trips'); });
+$('cancelEdit').addEventListener('click', () => { resetExpenseForm(); showView(editReturn); });
+$('deleteExpense').addEventListener('click', () => {
+  if (!deleteExpense($('editId').value)) return;
+  resetExpenseForm();
+  showView(editReturn);
+});
+
+// The keyboard's Enter key (Android's arrow or Go key) used to save the form, which saved
+// half-checked expenses by accident. Now it moves to the next box you type in, and in the
+// last box it just closes the keyboard. Only the Save button saves.
+$('expenseForm').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
+  e.preventDefault();
+  const order = ['amount', 'atmFee', 'note'].map($).filter(el => el && !el.closest('[hidden]'));
+  const next = order[order.indexOf(e.target) + 1];
+  if (next) next.focus();
+  else e.target.blur();
+});
 
 $('expenseForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -332,14 +351,19 @@ $('expenseForm').addEventListener('submit', async e => {
   }
   toast(editId ? 'Expense updated' : 'Saved · ' + money(expense.homeAmount + expense.homeFee));
   renderAddView();
-  if (editId) showView('trips');
+  if (editId) showView(editReturn);
   else $('amount').focus();
 });
 
-function editExpense(id) {
+let editReturn = 'trips'; // where Save, Cancel and Delete take you after an edit
+
+function editExpense(id, from = 'trips') {
   const x = state.expenses.find(e => e.id === id);
   if (!x) return;
+  editReturn = from;
   showView('add');
+  $('deleteRow').hidden = false;
+  $('scanBar').hidden = true; // a scan would replace the expense being edited
   scanned = false;
   scanStatus('');
   $('scanDetails').hidden = true;
@@ -366,12 +390,15 @@ function editExpense(id) {
   updateConverted();
 }
 
+// Deletes an expense after asking. Returns true if it was deleted.
 function deleteExpense(id) {
-  if (!confirm('Delete this expense?')) return;
+  const x = state.expenses.find(e => e.id === id);
+  if (!x || !confirm(`Delete ${x.note || x.category} (${money(x.amount, x.currency)})?`)) return false;
   state.expenses = state.expenses.filter(e => e.id !== id);
   save();
-  renderTrips();
+  renderAll();
   toast('Expense deleted');
+  return true;
 }
 
 // ---------- Receipt scanning ----------
@@ -603,6 +630,7 @@ function renderSort() {
           <div class="sub">${fmtDate(e.date)} · ${money(e.amount, e.currency)}</div>
         </div>
         <button type="button" class="icon-btn" data-sort-edit="${e.id}">Edit</button>
+        <button type="button" class="icon-btn danger" data-sort-del="${e.id}" aria-label="Delete ${esc(e.note || 'receipt')}">Delete</button>
       </div>
       <div class="cat-chips" role="group" aria-label="Category for ${esc(e.note || 'receipt')}">
         ${cats.map(c => `<button type="button" data-file="${e.id}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}
@@ -616,9 +644,10 @@ $('sortBanner').addEventListener('click', () => showView('sort'));
 $('sortBack').addEventListener('click', () => { renderAddView(); showView('add'); });
 
 $('sortList').addEventListener('click', ev => {
-  const b = ev.target.closest('[data-file],[data-sort-edit]');
+  const b = ev.target.closest('[data-file],[data-sort-edit],[data-sort-del]');
   if (!b) return;
-  if (b.dataset.sortEdit) { editExpense(b.dataset.sortEdit); return; }
+  if (b.dataset.sortEdit) { editExpense(b.dataset.sortEdit, 'sort'); return; }
+  if (b.dataset.sortDel) { deleteExpense(b.dataset.sortDel); return; }
   const x = state.expenses.find(e => e.id === b.dataset.file);
   if (!x) return;
   x.category = b.dataset.cat;

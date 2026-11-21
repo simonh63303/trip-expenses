@@ -29,7 +29,7 @@ Then open http://localhost:8765.
 ## How it works
 
 - **Trips tab**: create a trip and pick its local currency (e.g. JPY). The active trip is shown at the top. A built-in **Everyday** trip holds daily, non-trip spending; you can rename it but not delete it.
-- **Add tab**: enter the amount, currency, category and trip. The dollar (home currency) equivalent appears as you type. Choosing **Cash withdrawal** shows an ATM fee field. To move an expense to another trip or category, open it from the Trips tab and change either one.
+- **Add tab**: enter the amount, currency, category and trip. The dollar (home currency) equivalent appears as you type. Choosing **Cash withdrawal** shows an ATM fee field. To move an expense to another trip or category, open it from the Trips tab and change either one. The edit form also has **Delete expense**. The keyboard's arrow key moves to the next box; only **Save** saves.
 - **Summary tab**: total, per day, ATM fees, cash withdrawn, plus bars by week and by category. Switch between "This trip" and "All trips".
 - **Report tab**: pick a trip (or all trips), or a date range (optionally one trip). Tap category buttons to limit the report to those categories; **All** clears the filter. It shows totals, spend by category, by trip and by currency, then every expense. Two buttons export it as CSV for a spreadsheet:
   - **Export details**: one row per expense (date, trip, category, note, amount and currency, rate, home amount, ATM fee, statement amount, bank markup, cost) and a total row.
@@ -44,7 +44,7 @@ In the home-screen app, **Export backup** (and the CSV exports) open the Share s
 ### Scanning receipts
 Tap **Scan receipt** on the Add tab to open the camera, or **From photos** to use a picture you already took. The phone reads it with Tesseract (no server, nothing leaves the device) and fills in the total, date and shop name. Check them, fix anything it misread, and tap **Save**. **What the scanner read** shows the raw text if you want to see where a number came from.
 
-- Scans go to the **Everyday** trip, in the **Uncategorized** category. A **"3 to sort"** button then appears on the Add tab; it opens **To sort**, where one tap files each receipt under a category, and a picker moves it to a trip.
+- Scans go to the **Everyday** trip, in the **Uncategorized** category. A **"3 to sort"** button then appears on the Add tab; it opens **To sort**, where one tap files each receipt under a category, a picker moves it to a trip, and **Delete** removes a bad scan.
 - The total comes from a line like "Total" or "Amount due", never "Subtotal", "Tax" or "Change". With no such line, the largest amount is used.
 - Dates like 03/04/2026 are read month-first (US), unless that gives an impossible or future date.
 - The first scan downloads the reader (about 7 MB). After that, scanning works offline. The photo itself is not kept.
