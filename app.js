@@ -529,7 +529,17 @@ function scanStatus(msg, isError = false) {
   el.classList.toggle('error', isError);
 }
 
+// On Android the keyboard keeps its own copy of the box being typed in. Changing a box's
+// value while it has focus leaves that copy stale, and when the box loses focus the
+// keyboard writes the stale copy back, blanking the scanned amount. So let go of focus
+// before filling in anything.
+function releaseFocus() {
+  const el = document.activeElement;
+  if (el && el !== document.body && el.blur) el.blur();
+}
+
 function fillFromScan(r, text) {
+  releaseFocus();
   resetExpenseForm();
   const everyday = tripById(EVERYDAY);
   $('expTrip').value = EVERYDAY;
@@ -546,7 +556,7 @@ function fillFromScan(r, text) {
   scanStatus(r.amount
     ? `Found ${money(r.amount, everyday.currency)}${r.date ? '' : ' (no date found, so today is used)'}. Check the details, then Save.`
     : "Couldn't find the total. Type it in, then Save.");
-  $('amount').focus();
+  if (r.amount == null) $('amount').focus(); // only when it needs typing; focusing after the value is set is safe
 }
 
 // Two ways in: the camera, or a photo already taken. Both run the same scan.
@@ -554,6 +564,7 @@ async function scanPicked(e) {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
+  releaseFocus();
   if (!$('view-add').classList.contains('active')) showView('add');
   $('scanCamera').disabled = $('scanFile').disabled = true;
   scanStatus('Getting the receipt reader ready…');
