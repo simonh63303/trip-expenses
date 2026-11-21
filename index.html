@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
   <header class="topbar">
@@ -31,7 +31,7 @@
           <button type="button" id="nudgeLater">Later</button>
         </div>
       </div>
-      <div class="scan-bar">
+      <div class="scan-bar" id="scanBar">
         <!-- capture opens the camera directly; without it, newer Android phones only show the photo picker -->
         <label class="button scan-btn" id="scanBtn">📷 Scan receipt<input id="scanCamera" type="file" accept="image/*" capture="environment" hidden></label>
         <label class="button scan-pick" id="scanPickBtn">From photos<input id="scanFile" type="file" accept="image/*" hidden></label>
@@ -42,7 +42,7 @@
         <input type="hidden" id="editId">
         <div class="row">
           <label class="grow">Amount
-            <input id="amount" type="number" inputmode="decimal" step="any" min="0" required>
+            <input id="amount" type="number" inputmode="decimal" step="any" min="0" enterkeyhint="next" required>
           </label>
           <label>Currency
             <select id="currency"></select>
@@ -60,7 +60,7 @@
         </div>
 
         <label id="feeWrap" hidden>ATM fee <small>(same currency as withdrawal)</small>
-          <input id="atmFee" type="number" inputmode="decimal" step="any" min="0">
+          <input id="atmFee" type="number" inputmode="decimal" step="any" min="0" enterkeyhint="next">
         </label>
 
         <div class="row">
@@ -70,7 +70,7 @@
         </div>
 
         <label>Note <small>(optional)</small>
-          <input id="note" type="text" maxlength="120" placeholder="e.g. Ramen near hotel">
+          <input id="note" type="text" maxlength="120" placeholder="e.g. Ramen near hotel" enterkeyhint="done">
         </label>
 
         <details id="scanDetails" hidden>
@@ -80,13 +80,16 @@
 
         <details id="rateDetails">
           <summary>Exchange rate</summary>
-          <label>1 <span class="homeCode"></span> = <input id="rate" type="number" step="any" min="0" inputmode="decimal"> <span id="rateCur"></span></label>
+          <label>1 <span class="homeCode"></span> = <input id="rate" type="number" step="any" min="0" inputmode="decimal" enterkeyhint="done"> <span id="rateCur"></span></label>
           <p class="hint">Filled in automatically with the market rate for the expense's date. Change it to match your card statement.</p>
           <button type="button" id="rateForDate" class="link-btn">Use market rate for this date</button>
         </details>
         <div class="row actions">
           <button type="submit" class="primary grow" id="saveBtn">Save expense</button>
           <button type="button" id="cancelEdit" hidden>Cancel</button>
+        </div>
+        <div class="row" id="deleteRow" hidden>
+          <button type="button" id="deleteExpense" class="danger grow">Delete expense</button>
         </div>
       </form>
     </section>
@@ -214,6 +217,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
 
   <script src="rates.js?v=4"></script>
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
